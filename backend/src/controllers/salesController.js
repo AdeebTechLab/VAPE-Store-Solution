@@ -1,0 +1,338 @@
+const { getShopConnection } = require('../config/database');
+const productSchema = require('../models/Product');
+const transactionSchema = require('../models/Transaction');
+const sessionReportSchema = require('../models/SessionReport');
+const sessionService = require('../services/sessionService');
+const asyncHandler = require('../utils/asyncHandler');
+
+/**
+ * Sell a product (shopkeeper operation)
+ * POST /api/shop/:shopDbName/sell
+ */
+const sellProduct = asyncHandler(async (req, res) => {
+    const { shopDbName } = req.params;
+    const { productId, qty } = req.body;
+    const sessionId = req.user.sessionId;
+
+    const quantity = parseInt(qty) || 1;
+
+    // Connect to shop database
+    const shopConn = await getShopConnection(shopDbName);
+    const Product = shopConn.model('Product', productSchema);
+    const Transaction = shopConn.model('Transaction', transactionSchema);
+
+    // Find product and decrement units atomically
+    const product = await Product.findOneAndUpdate(
+        {
+            _id: productId,
+            units: { $gte: quantity } // Ensure enough units available
+        },
+        {
+            $inc: { units: -quantity }
+        },
+        {
+            new: true,
+            runValidators: true,
+        }
+    );
+
+    if (!product) {
+        return res.status(400).json({
+            success: false,
+            message: 'Insufficient inventory or product not found',
+        });
+    }
+
+    // Calculate total price
+    const totalPrice = product.pricePerUnit * quantity;
+
+    // Create transaction record
+    const transaction = new Transaction({
+        productId: product._id,
+        productName: product.name,
+        qty: quantity,
+        pricePerUnit: product.pricePerUnit,
+        totalPrice,
+        soldByShopkeeperId: req.user.id,
+        sessionId,
+    });
+
+    await transaction.save();
+
+    // Update session
+    sessionService.updateSession(sessionId, totalPrice);
+
+    res.json({
+        success: true,
+        message: 'Product sold successfully',
+        transaction: {
+            id: transaction._id,
+            productName: transaction.productName,
+            qty: transaction.qty,
+            totalPrice: transaction.totalPrice,
+        },
+        product: {
+            id: product._id,
+            name: product.name,
+            remainingUnits: product.units,
+        },
+    });
+});
+
+/**
+ * Sell multiple products at once (cart checkout)
+ * POST /api/shop/:shopDbName/sell-bulk
+ */
+const sellBulk = asyncHandler(async (req, res) => {
+    const { shopDbName } = req.params;
+    const { items } = req.body; // Array of { productId, qty, type: 'product' | 'ml', mlAmount, openedBottleId }
+    const sessionId = req.user.sessionId;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'No items to sell',
+        });
+    }
+
+    const shopConn = await getShopConnection(shopDbName);
+    const Product = shopConn.model('Product', productSchema);
+    const Transaction = shopConn.model('Transaction', transactionSchema);
+    const openedBottleSchema = require('../models/OpenedBottle');
+    const OpenedBottle = shopConn.model('OpenedBottle', openedBottleSchema);
+
+    const soldItems = [];
+    const errors = [];
+    let totalAmount = 0;
+
+    for (const item of items) {
+        try {
+            if (item.type === 'ml' && item.openedBottleId) {
+                // Selling ML from opened bottle
+                const openedBottle = await OpenedBottle.findById(item.openedBottleId);
+                if (!openedBottle || openedBottle.remainingMl < item.mlAmount) {
+                    errors.push(`Insufficient ML for ${item.productName}`);
+                    continue;
+                }
+
+                const product = await Product.findById(openedBottle.productId);
+                const mlPrice = product ? (product.pricePerUnit / product.mlCapacity) * item.mlAmount : 0;
+
+                // Update opened bottle
+                openedBottle.remainingMl -= item.mlAmount;
+                openedBottle.salesHistory.push({
+                    mlSold: item.mlAmount,
+                    soldAt: new Date(),
+                    soldBy: req.user?.username || 'Unknown',
+                });
+
+                if (openedBottle.remainingMl <= 0) {
+                    openedBottle.status = 'empty';
+                    openedBottle.remainingMl = 0;
+                    if (product) {
+                        product.hasOpenedBottle = false;
+                        await product.save();
+                    }
+                }
+                await openedBottle.save();
+
+                // Create transaction
+                const transaction = new Transaction({
+                    productId: openedBottle.productId,
+                    productName: `${openedBottle.productName} (${item.mlAmount}ml)`,
+                    qty: 1,
+                    pricePerUnit: mlPrice,
+                    totalPrice: mlPrice,
+                    soldByShopkeeperId: req.user?.id,
+                    sessionId,
+                });
+                await transaction.save();
+
+                soldItems.push({
+                    name: `${openedBottle.productName} (${item.mlAmount}ml)`,
+                    qty: 1,
+                    price: mlPrice,
+                });
+                totalAmount += mlPrice;
+                sessionService.updateSession(sessionId, mlPrice);
+
+            } else {
+                // Selling regular product
+                const quantity = parseInt(item.qty) || 1;
+                const product = await Product.findOneAndUpdate(
+                    { _id: item.productId, units: { $gte: quantity } },
+                    { $inc: { units: -quantity } },
+                    { new: true }
+                );
+
+                if (!product) {
+                    errors.push(`Insufficient stock for ${item.productName || 'product'}`);
+                    continue;
+                }
+
+                const itemTotal = product.pricePerUnit * quantity;
+
+                const transaction = new Transaction({
+                    productId: product._id,
+                    productName: product.name,
+                    qty: quantity,
+                    pricePerUnit: product.pricePerUnit,
+                    totalPrice: itemTotal,
+                    soldByShopkeeperId: req.user?.id,
+                    sessionId,
+                });
+                await transaction.save();
+
+                soldItems.push({
+                    name: product.name,
+                    qty: quantity,
+                    price: product.pricePerUnit,
+                });
+                totalAmount += itemTotal;
+                sessionService.updateSession(sessionId, itemTotal);
+            }
+        } catch (error) {
+            errors.push(`Error processing ${item.productName || 'item'}: ${error.message}`);
+        }
+    }
+
+    if (soldItems.length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'No items could be sold',
+            errors,
+        });
+    }
+
+    res.json({
+        success: true,
+        message: `Sold ${soldItems.length} item(s)`,
+        soldItems,
+        totalAmount,
+        errors: errors.length > 0 ? errors : undefined,
+    });
+});
+
+/**
+ * Logout and generate session report
+ * POST /api/shop/:shopDbName/logout
+ */
+const logoutAndGenerateReport = asyncHandler(async (req, res) => {
+    const { shopDbName } = req.params;
+    const sessionId = req.user.sessionId;
+
+    // End session
+    const session = sessionService.endSession(sessionId);
+
+    if (!session) {
+        return res.status(404).json({
+            success: false,
+            message: 'Session not found',
+        });
+    }
+
+    // Connect to shop database
+    const shopConn = await getShopConnection(shopDbName);
+    const Transaction = shopConn.model('Transaction', transactionSchema);
+    const SessionReport = shopConn.model('SessionReport', sessionReportSchema);
+
+    // Get all transactions for this session
+    const transactions = await Transaction.find({ sessionId }).sort({ soldAt: 1 });
+
+    // Aggregate sold items
+    const soldItems = transactions.map(t => ({
+        productId: t.productId,
+        productName: t.productName,
+        qty: t.qty,
+        pricePerUnit: t.pricePerUnit,
+        totalPrice: t.totalPrice,
+    }));
+
+    const totalAmount = transactions.reduce((sum, t) => sum + t.totalPrice, 0);
+    const totalItemsSold = transactions.reduce((sum, t) => sum + t.qty, 0);
+
+    // Create session report
+    const sessionReport = new SessionReport({
+        sessionId,
+        shopkeeperId: req.user.id,
+        shopkeeperUsername: req.user.username,
+        startTime: session.startTime,
+        endTime: session.endTime || new Date(),
+        soldItems,
+        totalAmount,
+        totalItemsSold,
+    });
+
+    await sessionReport.save();
+
+    res.json({
+        success: true,
+        message: 'Session ended and report generated',
+        report: {
+            sessionId: sessionReport.sessionId,
+            startTime: sessionReport.startTime,
+            endTime: sessionReport.endTime,
+            totalItemsSold: sessionReport.totalItemsSold,
+            totalAmount: sessionReport.totalAmount,
+            soldItems: sessionReport.soldItems,
+        },
+    });
+});
+
+/**
+ * Get current session info
+ * GET /api/shop/:shopDbName/session
+ */
+const getSessionInfo = asyncHandler(async (req, res) => {
+    const sessionId = req.user.sessionId;
+
+    const session = sessionService.getSession(sessionId);
+
+    if (!session) {
+        return res.status(404).json({
+            success: false,
+            message: 'Session not found',
+        });
+    }
+
+    res.json({
+        success: true,
+        session: {
+            sessionId: session.sessionId,
+            startTime: session.startTime,
+            salesCount: session.salesCount,
+            totalAmount: session.totalAmount,
+        },
+    });
+});
+
+/**
+ * Get transaction history for current session
+ * GET /api/shop/:shopDbName/transactions
+ */
+const getSessionTransactions = asyncHandler(async (req, res) => {
+    const { shopDbName } = req.params;
+    const sessionId = req.user.sessionId;
+
+    // Connect to shop database
+    const shopConn = await getShopConnection(shopDbName);
+    const Transaction = shopConn.model('Transaction', transactionSchema);
+
+    const transactions = await Transaction
+        .find({ sessionId })
+        .sort({ soldAt: -1 });
+
+    res.json({
+        success: true,
+        count: transactions.length,
+        transactions,
+    });
+});
+
+module.exports = {
+    sellProduct,
+    sellBulk,
+    logoutAndGenerateReport,
+    getSessionInfo,
+    getSessionTransactions,
+};
