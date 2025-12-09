@@ -16,7 +16,16 @@ const connectAdminDB = async () => {
         // Remove trailing slash from MONGO_URI if present
         const baseUri = config.mongoUri.replace(/\/$/, '');
         const adminDbUri = `${baseUri}/${config.adminDbName}`;
-        connections.admin = await mongoose.createConnection(adminDbUri);
+
+        // TLS options for Node.js v22 compatibility with MongoDB Atlas
+        const connectionOptions = {
+            tls: true,
+            tlsAllowInvalidCertificates: true,
+            serverSelectionTimeoutMS: 30000,
+            connectTimeoutMS: 30000,
+        };
+
+        connections.admin = await mongoose.createConnection(adminDbUri, connectionOptions);
 
         console.log(`✓ Connected to Admin DB: ${config.adminDbName}`);
         return connections.admin;
@@ -40,7 +49,16 @@ const getShopConnection = async (shopDbName) => {
         // Remove trailing slash from MONGO_URI if present
         const baseUri = config.mongoUri.replace(/\/$/, '');
         const shopDbUri = `${baseUri}/${shopDbName}`;
-        connections[shopDbName] = await mongoose.createConnection(shopDbUri);
+
+        // TLS options for Node.js v22 compatibility with MongoDB Atlas
+        const connectionOptions = {
+            tls: true,
+            tlsAllowInvalidCertificates: true,
+            serverSelectionTimeoutMS: 30000,
+            connectTimeoutMS: 30000,
+        };
+
+        connections[shopDbName] = await mongoose.createConnection(shopDbUri, connectionOptions);
 
         console.log(`✓ Connected to Shop DB: ${shopDbName}`);
         return connections[shopDbName];

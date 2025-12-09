@@ -5,7 +5,7 @@ const productController = require('../controllers/productController');
 const shopkeeperController = require('../controllers/shopkeeperController');
 const auth = require('../middleware/auth');
 const { isAdmin } = require('../middleware/roleCheck');
-const upload = require('../middleware/upload');
+const { upload } = require('../middleware/upload');
 const { validateProduct, validateShopkeeper } = require('../middleware/validation');
 
 // All admin routes require authentication and admin role

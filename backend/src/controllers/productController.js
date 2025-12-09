@@ -3,7 +3,7 @@ const shopSchema = require('../models/Shop');
 const productSchema = require('../models/Product');
 const asyncHandler = require('../utils/asyncHandler');
 const { generateQRCode } = require('../services/qrService');
-const path = require('path');
+const { uploadToCloudinary } = require('../middleware/upload');
 
 /**
  * Get all products for a shop
@@ -168,7 +168,8 @@ const createProduct = asyncHandler(async (req, res) => {
 
         // Update image if new one is uploaded
         if (req.file) {
-            existingProduct.imageUrl = `/uploads/${req.file.filename}`;
+            const result = await uploadToCloudinary(req.file.buffer);
+            existingProduct.imageUrl = result.secure_url;
         }
 
         await existingProduct.save();
@@ -184,7 +185,8 @@ const createProduct = asyncHandler(async (req, res) => {
     // Handle image upload for new product
     let imageUrl = '';
     if (req.file) {
-        imageUrl = `/uploads/${req.file.filename}`;
+        const result = await uploadToCloudinary(req.file.buffer);
+        imageUrl = result.secure_url;
     }
 
     // Initialize barcodes array
@@ -259,7 +261,8 @@ const updateProduct = asyncHandler(async (req, res) => {
 
     // Handle image upload
     if (req.file) {
-        product.imageUrl = `/uploads/${req.file.filename}`;
+        const result = await uploadToCloudinary(req.file.buffer);
+        product.imageUrl = result.secure_url;
     }
 
     await product.save();
