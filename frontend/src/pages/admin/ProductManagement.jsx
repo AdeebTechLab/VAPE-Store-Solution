@@ -475,7 +475,7 @@ const ProductManagement = () => {
                                             <td className="px-4 py-3">
                                                 {product.imageUrl ? (
                                                     <img
-                                                        src={`${BACKEND_URL}${product.imageUrl}`}
+                                                        src={product.imageUrl.startsWith('http') ? product.imageUrl : `${BACKEND_URL}${product.imageUrl}`}
                                                         alt={product.name}
                                                         className="w-10 h-10 object-cover rounded"
                                                         onError={(e) => {

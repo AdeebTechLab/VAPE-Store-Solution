@@ -517,7 +517,7 @@ const Home = () => {
                                         <div className="w-12 h-12 bg-gray-700 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
                                             {bottle.imageUrl ? (
                                                 <img
-                                                    src={`${BACKEND_URL}${bottle.imageUrl}`}
+                                                    src={bottle.imageUrl.startsWith('http') ? bottle.imageUrl : `${BACKEND_URL}${bottle.imageUrl}`}
                                                     alt={bottle.productName}
                                                     className="w-full h-full object-cover"
                                                 />
@@ -575,7 +575,7 @@ const Home = () => {
                                 <div className="h-24 bg-gray-700 rounded-lg mb-2 flex items-center justify-center overflow-hidden">
                                     {product.imageUrl ? (
                                         <img
-                                            src={`${BACKEND_URL}${product.imageUrl}`}
+                                            src={product.imageUrl.startsWith('http') ? product.imageUrl : `${BACKEND_URL}${product.imageUrl}`}
                                             alt={product.name}
                                             className="w-full h-full object-cover"
                                             onError={(e) => {
