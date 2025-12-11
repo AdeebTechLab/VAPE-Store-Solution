@@ -274,7 +274,7 @@ Built with ❤️ for vape shop inventory management
 
 For issues, questions, or suggestions:
 - Open an issue on GitHub
-- Contact: [your-email@example.com]
+- Contact: [AdeebTechnologyLab@gmail.com]
 
 ---
 
