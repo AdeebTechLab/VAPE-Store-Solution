@@ -56,8 +56,13 @@ const Dashboard = () => {
             <nav className="bg-gray-800 border-b border-gray-700">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-16">
-                        <div className="flex items-center">
-                            <h1 className="text-xl font-bold text-white">VapeShop Admin</h1>
+                        <div className="flex items-center gap-3">
+                            <img
+                                src="/assets/logo.jpg"
+                                alt="Al Hadi Vapes"
+                                className="w-10 h-10 rounded-lg object-contain"
+                            />
+                            <h1 className="text-xl font-bold text-white">Al Hadi Vapes Admin</h1>
                         </div>
                         <div className="flex items-center space-x-4">
                             <span className="text-gray-300">Welcome, {user?.username}</span>
@@ -89,7 +94,7 @@ const Dashboard = () => {
                     <div className="card">
                         <h3 className="text-sm font-medium text-gray-400 mb-2">Today's Sales</h3>
                         <p className="text-3xl font-bold text-green-400">
-                            ${shops.reduce((sum, shop) => sum + (shop.stats?.todaysSales || 0), 0).toFixed(2)}
+                            Rs {shops.reduce((sum, shop) => sum + (shop.stats?.todaysSales || 0), 0).toFixed(2)}
                         </p>
                     </div>
                     <div className="card">
@@ -119,7 +124,7 @@ const Dashboard = () => {
                                             </span>
                                             <span className="text-sm text-gray-300">
                                                 Today's Sales: <span className="font-semibold text-green-400">
-                                                    ${(shop.stats?.todaysSales || 0).toFixed(2)}
+                                                    Rs {(shop.stats?.todaysSales || 0).toFixed(2)}
                                                 </span>
                                             </span>
                                         </div>

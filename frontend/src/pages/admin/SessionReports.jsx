@@ -151,7 +151,7 @@ const SessionReports = () => {
                                                 </div>
                                                 <div className="text-right">
                                                     <p className="text-lg font-bold text-green-400">
-                                                        ${report.totalAmount?.toFixed(2) || '0.00'}
+                                                        Rs {report.totalAmount?.toFixed(2) || '0.00'}
                                                     </p>
                                                     <p className="text-sm text-gray-400">
                                                         {report.totalItemsSold || 0} items
@@ -215,7 +215,7 @@ const SessionReports = () => {
                                     <div className="grid grid-cols-2 gap-3 mb-4">
                                         <div className="bg-green-900/30 p-3 rounded-lg text-center">
                                             <p className="text-2xl font-bold text-green-400">
-                                                ${selectedReport.totalAmount?.toFixed(2)}
+                                                Rs {selectedReport.totalAmount?.toFixed(2)}
                                             </p>
                                             <p className="text-xs text-gray-400">Total Sales</p>
                                         </div>
@@ -235,11 +235,11 @@ const SessionReports = () => {
                                                 <div>
                                                     <p className="text-white">{item.productName}</p>
                                                     <p className="text-xs text-gray-400">
-                                                        {item.qty}x @ ${item.pricePerUnit?.toFixed(2)}
+                                                        {item.qty}x @ Rs {item.pricePerUnit?.toFixed(2)}
                                                     </p>
                                                 </div>
                                                 <p className="text-green-400 font-medium">
-                                                    ${item.totalPrice?.toFixed(2)}
+                                                    Rs {item.totalPrice?.toFixed(2)}
                                                 </p>
                                             </div>
                                         ))}

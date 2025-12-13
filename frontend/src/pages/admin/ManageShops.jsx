@@ -173,7 +173,7 @@ const ManageShops = () => {
                                                 <span className="badge badge-info">{shop.stats?.productCount || 0}</span>
                                             </td>
                                             <td className="px-4 py-3 text-green-400 font-semibold">
-                                                ${(shop.stats?.todaysSales || 0).toFixed(2)}
+                                                Rs {(shop.stats?.todaysSales || 0).toFixed(2)}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex gap-2">
@@ -201,48 +201,50 @@ const ManageShops = () => {
             </div>
 
             {/* Delete Confirmation Modal */}
-            {deleteConfirm.show && (
-                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-                    <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full border border-red-500/50">
-                        <div className="text-center">
-                            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                </svg>
-                            </div>
-                            <h3 className="text-xl font-bold text-white mb-2">⚠️ Warning: Delete Shop</h3>
-                            <p className="text-gray-400 mb-4">
-                                Are you sure you want to delete <span className="text-white font-semibold">"{deleteConfirm.shop?.name}"</span>?
-                            </p>
-                            <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-3 mb-6 text-left">
-                                <p className="text-red-400 text-sm font-medium mb-2">This will permanently delete:</p>
-                                <ul className="text-red-300 text-sm list-disc list-inside space-y-1">
-                                    <li>All products ({deleteConfirm.shop?.stats?.productCount || 0} items)</li>
-                                    <li>All shopkeeper accounts</li>
-                                    <li>All sales records & transactions</li>
-                                    <li>All session reports</li>
-                                    <li>The shop's database</li>
-                                </ul>
-                            </div>
-                            <div className="flex gap-3 justify-center">
-                                <button
-                                    onClick={() => setDeleteConfirm({ show: false, shop: null })}
-                                    className="btn-secondary px-6"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleDeleteShop}
-                                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition-all"
-                                >
-                                    Yes, Delete Shop
-                                </button>
+            {
+                deleteConfirm.show && (
+                    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                        <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full border border-red-500/50">
+                            <div className="text-center">
+                                <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-2">⚠️ Warning: Delete Shop</h3>
+                                <p className="text-gray-400 mb-4">
+                                    Are you sure you want to delete <span className="text-white font-semibold">"{deleteConfirm.shop?.name}"</span>?
+                                </p>
+                                <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-3 mb-6 text-left">
+                                    <p className="text-red-400 text-sm font-medium mb-2">This will permanently delete:</p>
+                                    <ul className="text-red-300 text-sm list-disc list-inside space-y-1">
+                                        <li>All products ({deleteConfirm.shop?.stats?.productCount || 0} items)</li>
+                                        <li>All shopkeeper accounts</li>
+                                        <li>All sales records & transactions</li>
+                                        <li>All session reports</li>
+                                        <li>The shop's database</li>
+                                    </ul>
+                                </div>
+                                <div className="flex gap-3 justify-center">
+                                    <button
+                                        onClick={() => setDeleteConfirm({ show: false, shop: null })}
+                                        className="btn-secondary px-6"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleDeleteShop}
+                                        className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition-all"
+                                    >
+                                        Yes, Delete Shop
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

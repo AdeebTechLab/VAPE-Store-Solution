@@ -29,6 +29,7 @@ const Home = () => {
     // Cart state
     const [cart, setCart] = useState([]);
     const [showCart, setShowCart] = useState(false);
+    const [discountPercent, setDiscountPercent] = useState(0);
 
     // QR Scan Mode state
     const [isScanMode, setIsScanMode] = useState(false);
@@ -228,6 +229,23 @@ const Home = () => {
         setCart(cart.map((item, i) => i === index ? { ...item, qty: newQty } : item));
     };
 
+    // Update item price in cart
+    const updateCartPrice = (index, newPrice) => {
+        if (newPrice < 0) return;
+        setCart(cart.map((item, i) => i === index ? { ...item, price: newPrice } : item));
+    };
+
+    // Calculate discount amount
+    const getDiscountAmount = () => {
+        const subtotal = getCartTotal();
+        return (subtotal * discountPercent) / 100;
+    };
+
+    // Get final total after discount
+    const getFinalTotal = () => {
+        return getCartTotal() - getDiscountAmount();
+    };
+
     // Calculate cart total
     const getCartTotal = () => {
         return cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
@@ -268,21 +286,28 @@ const Home = () => {
                 // Reload opened bottles
                 loadOpenedBottles();
 
+                // Calculate final amounts with discount
+                const subtotal = response.data.totalAmount;
+                const discountAmount = (subtotal * discountPercent) / 100;
+                const finalTotal = subtotal - discountAmount;
+
                 // Prepare and show receipt
                 const receipt = {
-                    shopName: user?.shopName || 'VapeShop',
+                    shopName: user?.shopName || 'Al Hadi Vapes',
                     date: new Date(),
                     receiptNo: `RCP-${Date.now().toString(36).toUpperCase()}`,
                     cashier: user?.username || 'Staff',
                     items: response.data.soldItems,
-                    subtotal: response.data.totalAmount,
-                    total: response.data.totalAmount,
+                    subtotal: subtotal,
+                    discount: discountPercent > 0 ? { percent: discountPercent, amount: discountAmount } : null,
+                    total: finalTotal,
                 };
                 setReceiptData(receipt);
                 setShowReceipt(true);
 
-                // Clear cart
+                // Clear cart and reset discount
                 setCart([]);
+                setDiscountPercent(0);
                 setShowCart(false);
                 showMessage('success', `Sold ${response.data.soldItems.length} item(s)`);
             }
@@ -418,9 +443,16 @@ const Home = () => {
             <nav className="bg-gray-800 border-b border-gray-700">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-16">
-                        <div>
-                            <h1 className="text-xl font-bold text-white">VapeShop POS</h1>
-                            <p className="text-xs text-gray-400">{user?.shopName || 'Shop'}</p>
+                        <div className="flex items-center gap-3">
+                            <img
+                                src="/assets/logo.jpg"
+                                alt="Al Hadi Vapes"
+                                className="w-10 h-10 rounded-lg object-contain"
+                            />
+                            <div>
+                                <h1 className="text-xl font-bold text-white">Al Hadi Vapes</h1>
+                                <p className="text-xs text-gray-400">{user?.shopName || 'Shop'}</p>
+                            </div>
                         </div>
                         <div className="flex items-center space-x-4">
                             {session && (
@@ -519,7 +551,7 @@ const Home = () => {
                                                 <img
                                                     src={bottle.imageUrl.startsWith('http') ? bottle.imageUrl : `${BACKEND_URL}${bottle.imageUrl}`}
                                                     alt={bottle.productName}
-                                                    className="w-full h-full object-cover"
+                                                    className="w-full h-full object-contain"
                                                 />
                                             ) : (
                                                 <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -577,7 +609,7 @@ const Home = () => {
                                         <img
                                             src={product.imageUrl.startsWith('http') ? product.imageUrl : `${BACKEND_URL}${product.imageUrl}`}
                                             alt={product.name}
-                                            className="w-full h-full object-cover"
+                                            className="w-full h-full object-contain"
                                             onError={(e) => {
                                                 e.target.onerror = null;
                                                 e.target.style.display = 'none';
@@ -595,7 +627,7 @@ const Home = () => {
                                 <p className="text-xs text-gray-400 truncate">{product.brand}</p>
 
                                 <div className="flex items-center justify-between mt-1 mb-2">
-                                    <span className="text-base font-bold text-primary">${product.pricePerUnit.toFixed(2)}</span>
+                                    <span className="text-base font-bold text-primary">Rs {product.pricePerUnit.toFixed(2)}</span>
                                     <span className={`text-xs px-1.5 py-0.5 rounded ${product.units > 10 ? 'bg-green-900 text-green-400' :
                                         product.units > 0 ? 'bg-yellow-900 text-yellow-400' : 'bg-red-900 text-red-400'
                                         }`}>
@@ -722,108 +754,166 @@ const Home = () => {
                 )}
             </button>
 
-            {/* Cart Drawer */}
+            {/* Cart Sidebar - Now a side panel that coexists with main content */}
             {showCart && (
-                <div className="fixed inset-0 z-50">
-                    <div className="absolute inset-0 bg-black/50" onClick={() => setShowCart(false)}></div>
-                    <div className="absolute right-0 top-0 h-full w-full max-w-md bg-gray-800 shadow-xl">
-                        <div className="flex flex-col h-full">
-                            {/* Cart Header */}
-                            <div className="flex items-center justify-between p-4 border-b border-gray-700">
-                                <h2 className="text-xl font-bold text-white">Shopping Cart ({cart.length})</h2>
-                                <button
-                                    onClick={() => setShowCart(false)}
-                                    className="p-2 hover:bg-gray-700 rounded-lg"
-                                >
-                                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <div className="fixed right-0 top-0 h-full w-80 bg-gray-800 shadow-xl z-40 border-l border-gray-700">
+                    <div className="flex flex-col h-full">
+                        {/* Cart Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+                            <h2 className="text-xl font-bold text-white">Shopping Cart ({cart.length})</h2>
+                            <button
+                                onClick={() => setShowCart(false)}
+                                className="p-2 hover:bg-gray-700 rounded-lg"
+                            >
+                                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Cart Items */}
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {cart.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                                    <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                                     </svg>
-                                </button>
+                                    <p>Cart is empty</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {cart.map((item, index) => (
+                                        <div key={index} className="bg-gray-700 rounded-lg p-2">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <div className="flex-1">
+                                                    <h4 className="text-white font-medium text-sm">{item.productName}</h4>
+                                                </div>
+                                                <button
+                                                    onClick={() => removeFromCart(index)}
+                                                    className="p-1 text-red-400 hover:text-red-300"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            {/* Editable Price */}
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-xs text-gray-400">Price:</span>
+                                                <input
+                                                    type="number"
+                                                    value={item.price}
+                                                    onChange={(e) => updateCartPrice(index, Number(e.target.value))}
+                                                    className="w-20 px-2 py-1 bg-gray-800 text-yellow-400 font-medium text-sm rounded border border-gray-600 focus:border-yellow-500 focus:outline-none"
+                                                    min="0"
+                                                    step="0.01"
+                                                />
+                                                <span className="text-xs text-gray-500">Rs</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                {item.type === 'product' ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => updateCartQty(index, item.qty - 1)}
+                                                            className="w-8 h-8 bg-gray-600 hover:bg-gray-500 rounded-lg flex items-center justify-center"
+                                                        >
+                                                            <span className="text-white text-lg">-</span>
+                                                        </button>
+                                                        <span className="text-white px-3">{item.qty}</span>
+                                                        <button
+                                                            onClick={() => updateCartQty(index, item.qty + 1)}
+                                                            disabled={item.qty >= item.maxQty}
+                                                            className="w-8 h-8 bg-gray-600 hover:bg-gray-500 rounded-lg flex items-center justify-center disabled:opacity-50"
+                                                        >
+                                                            <span className="text-white text-lg">+</span>
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-sm text-blue-400">{item.mlAmount}ml</span>
+                                                )}
+                                                <span className="text-lg font-bold text-green-400">
+                                                    Rs {(item.price * item.qty).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Cart Footer */}
+                        <div className="p-4 border-t border-gray-700">
+                            {/* Subtotal */}
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-gray-400">Subtotal</span>
+                                <span className="text-lg font-medium text-white">Rs {getCartTotal().toFixed(2)}</span>
                             </div>
 
-                            {/* Cart Items */}
-                            <div className="flex-1 overflow-y-auto p-4">
-                                {cart.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                                        <svg className="w-16 h-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                                        </svg>
-                                        <p>Cart is empty</p>
+                            {/* Discount Input */}
+                            {cart.length > 0 && (
+                                <div className="mb-3 p-3 bg-gray-700/50 rounded-lg">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm text-gray-300">Discount</span>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                value={discountPercent}
+                                                onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
+                                                className="w-16 px-2 py-1 bg-gray-800 text-white text-center rounded border border-gray-600 focus:border-primary focus:outline-none"
+                                            />
+                                            <span className="text-gray-400">%</span>
+                                        </div>
                                     </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        {cart.map((item, index) => (
-                                            <div key={index} className="bg-gray-700 rounded-lg p-3">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div className="flex-1">
-                                                        <h4 className="text-white font-medium">{item.productName}</h4>
-                                                        <p className="text-sm text-gray-400">${item.price.toFixed(2)} each</p>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => removeFromCart(index)}
-                                                        className="p-1 text-red-400 hover:text-red-300"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    {item.type === 'product' ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <button
-                                                                onClick={() => updateCartQty(index, item.qty - 1)}
-                                                                className="w-8 h-8 bg-gray-600 hover:bg-gray-500 rounded-lg flex items-center justify-center"
-                                                            >
-                                                                <span className="text-white text-lg">-</span>
-                                                            </button>
-                                                            <span className="text-white px-3">{item.qty}</span>
-                                                            <button
-                                                                onClick={() => updateCartQty(index, item.qty + 1)}
-                                                                disabled={item.qty >= item.maxQty}
-                                                                className="w-8 h-8 bg-gray-600 hover:bg-gray-500 rounded-lg flex items-center justify-center disabled:opacity-50"
-                                                            >
-                                                                <span className="text-white text-lg">+</span>
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-sm text-blue-400">{item.mlAmount}ml</span>
-                                                    )}
-                                                    <span className="text-lg font-bold text-green-400">
-                                                        ${(item.price * item.qty).toFixed(2)}
-                                                    </span>
-                                                </div>
-                                            </div>
+                                    {/* Quick discount buttons */}
+                                    <div className="flex gap-2 flex-wrap">
+                                        {[0, 5, 10, 15, 20, 25].map(percent => (
+                                            <button
+                                                key={percent}
+                                                onClick={() => setDiscountPercent(percent)}
+                                                className={`px-2 py-1 text-xs rounded transition-all ${discountPercent === percent
+                                                    ? 'bg-primary text-white'
+                                                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                                                    }`}
+                                            >
+                                                {percent === 0 ? 'None' : `${percent}%`}
+                                            </button>
                                         ))}
                                     </div>
-                                )}
+                                    {discountPercent > 0 && (
+                                        <div className="flex justify-between items-center mt-2 text-red-400">
+                                            <span className="text-sm">Discount ({discountPercent}%)</span>
+                                            <span className="font-medium">-Rs {getDiscountAmount().toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Final Total */}
+                            <div className="flex justify-between items-center mb-4 py-2 border-t border-gray-600">
+                                <span className="text-lg font-semibold text-white">Total</span>
+                                <span className="text-2xl font-bold text-green-400">Rs {getFinalTotal().toFixed(2)}</span>
                             </div>
 
-                            {/* Cart Footer */}
-                            <div className="p-4 border-t border-gray-700">
-                                <div className="flex justify-between items-center mb-4">
-                                    <span className="text-gray-400">Subtotal</span>
-                                    <span className="text-2xl font-bold text-white">${getCartTotal().toFixed(2)}</span>
-                                </div>
+                            <button
+                                onClick={handleCheckout}
+                                disabled={cart.length === 0}
+                                className={`w-full py-3 rounded-lg font-semibold text-lg transition-all ${cart.length > 0
+                                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                                    : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                                    }`}
+                            >
+                                Checkout ({cart.length} items) - Rs {getFinalTotal().toFixed(2)}
+                            </button>
+                            {cart.length > 0 && (
                                 <button
-                                    onClick={handleCheckout}
-                                    disabled={cart.length === 0}
-                                    className={`w-full py-3 rounded-lg font-semibold text-lg transition-all ${cart.length > 0
-                                        ? 'bg-green-600 hover:bg-green-700 text-white'
-                                        : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                                        }`}
+                                    onClick={() => { setCart([]); setDiscountPercent(0); }}
+                                    className="w-full mt-2 py-2 text-red-400 hover:text-red-300 text-sm"
                                 >
-                                    Checkout ({cart.length} items)
+                                    Clear Cart
                                 </button>
-                                {cart.length > 0 && (
-                                    <button
-                                        onClick={() => setCart([])}
-                                        className="w-full mt-2 py-2 text-red-400 hover:text-red-300 text-sm"
-                                    >
-                                        Clear Cart
-                                    </button>
-                                )}
-                            </div>
+                            )}
                         </div>
                     </div>
                 </div>

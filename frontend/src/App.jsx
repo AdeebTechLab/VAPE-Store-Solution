@@ -17,7 +17,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="min-h-screen flex items-center justify-center bg-gray-900">
                 <div className="text-white text-xl">Loading...</div>
             </div>
         );
@@ -40,7 +40,7 @@ function AppRoutes() {
     // Wait for auth to load before rendering routes
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="min-h-screen flex items-center justify-center bg-gray-900">
                 <div className="text-white text-xl">Loading...</div>
             </div>
         );

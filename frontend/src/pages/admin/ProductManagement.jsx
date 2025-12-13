@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import api, { BACKEND_URL } from '../../services/api';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const ProductManagement = () => {
     const { shopId } = useParams();
@@ -8,6 +10,7 @@ const ProductManagement = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
+    const [shopName, setShopName] = useState('Shop');
 
     // Barcode scanning state
     const [isScanning, setIsScanning] = useState(false);
@@ -21,6 +24,7 @@ const ProductManagement = () => {
         category: 'Device',
         units: 0,
         pricePerUnit: 0,
+        costPrice: 0,
         shortDescription: '',
         barcode: '',
         mlCapacity: 0,
@@ -102,7 +106,22 @@ const ProductManagement = () => {
     useEffect(() => {
         fetchProducts();
         fetchOpenedBottles();
+        fetchShopInfo();
     }, [shopId]);
+
+    const fetchShopInfo = async () => {
+        try {
+            const response = await api.get('/admin/shops');
+            if (response.data.success) {
+                const shop = response.data.shops.find(s => s._id === shopId);
+                if (shop) {
+                    setShopName(shop.name);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching shop info:', error);
+        }
+    };
 
     const fetchProducts = async () => {
         try {
@@ -115,6 +134,166 @@ const ProductManagement = () => {
             console.error('Error fetching products:', error);
             setLoading(false);
         }
+    };
+
+    // PDF Download Function
+    const downloadProductsPDF = () => {
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const today = new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // Header - Shop Name
+        doc.setFontSize(22);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(79, 70, 229); // Purple color
+        doc.text(shopName, pageWidth / 2, 20, { align: 'center' });
+
+        // Subtitle
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 100, 100);
+        doc.text('Product Inventory Report', pageWidth / 2, 30, { align: 'center' });
+
+        // Date
+        doc.setFontSize(10);
+        doc.text(`Generated: ${today}`, pageWidth / 2, 38, { align: 'center' });
+
+        // Line separator
+        doc.setDrawColor(79, 70, 229);
+        doc.setLineWidth(0.5);
+        doc.line(20, 42, pageWidth - 20, 42);
+
+        // Summary Stats
+        const totalProducts = products.length;
+        const totalUnits = products.reduce((sum, p) => sum + (p.units || 0), 0);
+        const totalValue = products.reduce((sum, p) => sum + ((p.units || 0) * (p.pricePerUnit || 0)), 0);
+        const categories = [...new Set(products.map(p => p.category))];
+
+        doc.setFontSize(11);
+        doc.setTextColor(50, 50, 50);
+        doc.text(`Total Products: ${totalProducts}`, 20, 52);
+        doc.text(`Total Units: ${totalUnits}`, 80, 52);
+        doc.text(`Total Value: Rs ${totalValue.toFixed(2)}`, 140, 52);
+
+        // Products Table
+        const tableData = products.map((product, index) => [
+            index + 1,
+            product.name,
+            product.brand || '-',
+            product.category,
+            product.units || 0,
+            `Rs ${(product.pricePerUnit || 0).toFixed(2)}`,
+            `Rs ${((product.units || 0) * (product.pricePerUnit || 0)).toFixed(2)}`
+        ]);
+
+        // Products Section Title
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(79, 70, 229);
+        doc.text('Products Inventory', 14, 58);
+
+        autoTable(doc, {
+            startY: 62,
+            head: [['#', 'Product Name', 'Brand', 'Category', 'Units', 'Price', 'Total Value']],
+            body: tableData,
+            theme: 'striped',
+            headStyles: {
+                fillColor: [79, 70, 229],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'center'
+            },
+            bodyStyles: {
+                fontSize: 9,
+            },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 10 },
+                1: { cellWidth: 45 },
+                2: { cellWidth: 25 },
+                3: { halign: 'center', cellWidth: 25 },
+                4: { halign: 'center', cellWidth: 15 },
+                5: { halign: 'right', cellWidth: 25 },
+                6: { halign: 'right', cellWidth: 30 }
+            },
+            alternateRowStyles: {
+                fillColor: [245, 245, 250]
+            },
+            margin: { left: 10, right: 10 }
+        });
+
+        // Get Y position after products table
+        let currentY = doc.previousAutoTable?.finalY || 150;
+
+        // Opened Bottles Section (if any)
+        if (openedBottles && openedBottles.length > 0) {
+            currentY += 15;
+
+            // Check if we need a new page
+            if (currentY > 250) {
+                doc.addPage();
+                currentY = 20;
+            }
+
+            // Opened Bottles Section Title
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(16, 185, 129); // Green color
+            doc.text('Opened E-Liquid Bottles', 14, currentY);
+
+            const bottlesData = openedBottles.map((bottle, index) => [
+                index + 1,
+                bottle.productName || '-',
+                bottle.productBrand || '-',
+                `${bottle.mlCapacity || 0}ml`,
+                `${bottle.remainingMl || 0}ml`,
+                `${(((bottle.remainingMl || 0) / (bottle.mlCapacity || 1)) * 100).toFixed(0)}%`,
+                new Date(bottle.openedAt).toLocaleDateString()
+            ]);
+
+            autoTable(doc, {
+                startY: currentY + 4,
+                head: [['#', 'Product Name', 'Brand', 'Capacity', 'Remaining', '% Left', 'Opened Date']],
+                body: bottlesData,
+                theme: 'striped',
+                headStyles: {
+                    fillColor: [16, 185, 129],
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                    halign: 'center'
+                },
+                bodyStyles: {
+                    fontSize: 9,
+                },
+                columnStyles: {
+                    0: { halign: 'center', cellWidth: 10 },
+                    1: { cellWidth: 40 },
+                    2: { cellWidth: 30 },
+                    3: { halign: 'center', cellWidth: 22 },
+                    4: { halign: 'center', cellWidth: 22 },
+                    5: { halign: 'center', cellWidth: 18 },
+                    6: { halign: 'center', cellWidth: 28 }
+                },
+                alternateRowStyles: {
+                    fillColor: [240, 253, 244]
+                },
+                margin: { left: 10, right: 10 }
+            });
+
+            currentY = doc.previousAutoTable?.finalY || currentY + 50;
+        }
+
+        // Footer
+        const finalY = currentY + 15;
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text('Al Hadi Vapes - Product Inventory Report', pageWidth / 2, finalY, { align: 'center' });
+
+        // Save PDF
+        doc.save(`${shopName.replace(/\s+/g, '_')}_Products_${new Date().toISOString().split('T')[0]}.pdf`);
     };
 
     // Opened bottles state and functions
@@ -243,12 +422,23 @@ const ProductManagement = () => {
                         </Link>
                         <h1 className="text-2xl font-bold text-white">Product Management</h1>
                     </div>
-                    <button
-                        onClick={() => setShowAddForm(!showAddForm)}
-                        className="btn-primary"
-                    >
-                        {showAddForm ? 'Cancel' : '+ Add Product'}
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={downloadProductsPDF}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Download PDF
+                        </button>
+                        <button
+                            onClick={() => setShowAddForm(!showAddForm)}
+                            className="btn-primary"
+                        >
+                            {showAddForm ? 'Cancel' : '+ Add Product'}
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -369,6 +559,23 @@ const ProductManagement = () => {
                                         min="0"
                                         required
                                     />
+                                    <p className="text-xs text-gray-500 mt-1">Selling price (visible to shopkeepers)</p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Cost Price (Rs)
+                                        <span className="text-xs text-yellow-400 ml-1">📊 For Analytics</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={formData.costPrice}
+                                        onChange={(e) => setFormData({ ...formData, costPrice: Number(e.target.value) })}
+                                        className="input"
+                                        placeholder="e.g., 15.00"
+                                        min="0"
+                                    />
+                                    <p className="text-xs text-yellow-500 mt-1">🔒 Hidden from shopkeepers - used for profit calculation</p>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -440,7 +647,8 @@ const ProductManagement = () => {
                             <button type="submit" className="btn-primary">Add Product</button>
                         </form>
                     </div>
-                )}
+                )
+                }
 
                 {/* Products List */}
                 <div className="card">
@@ -521,63 +729,65 @@ const ProductManagement = () => {
                         </div>
                     )}
                 </div>
-            </div>
+            </div >
 
             {/* Opened Bottles Section */}
-            {openedBottles.length > 0 && (
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-                    <div className="card">
-                        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                            <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                            </svg>
-                            Opened Bottles ({openedBottles.length})
-                        </h2>
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-700">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left text-gray-300">Product</th>
-                                        <th className="px-4 py-3 text-left text-gray-300">Brand</th>
-                                        <th className="px-4 py-3 text-left text-gray-300">Remaining</th>
-                                        <th className="px-4 py-3 text-left text-gray-300">Status</th>
-                                        <th className="px-4 py-3 text-left text-gray-300">Opened By</th>
-                                        <th className="px-4 py-3 text-left text-gray-300">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-700">
-                                    {openedBottles.map((bottle) => (
-                                        <tr key={bottle._id} className="hover:bg-gray-700/50">
-                                            <td className="px-4 py-3 text-white font-medium">{bottle.productName}</td>
-                                            <td className="px-4 py-3 text-gray-400">{bottle.productBrand}</td>
-                                            <td className="px-4 py-3">
-                                                <span className={`font-bold ${bottle.remainingMl > 0 ? 'text-blue-400' : 'text-red-400'}`}>
-                                                    {bottle.remainingMl}ml / {bottle.mlCapacity}ml
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <span className={`badge ${bottle.status === 'active' ? 'badge-success' : 'badge-danger'}`}>
-                                                    {bottle.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-gray-400">{bottle.openedBy}</td>
-                                            <td className="px-4 py-3">
-                                                <button
-                                                    onClick={() => handleDeleteBottle(bottle._id)}
-                                                    className="btn-danger text-sm px-3 py-1"
-                                                >
-                                                    Delete
-                                                </button>
-                                            </td>
+            {
+                openedBottles.length > 0 && (
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+                        <div className="card">
+                            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                                <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                </svg>
+                                Opened Bottles ({openedBottles.length})
+                            </h2>
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-gray-700">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left text-gray-300">Product</th>
+                                            <th className="px-4 py-3 text-left text-gray-300">Brand</th>
+                                            <th className="px-4 py-3 text-left text-gray-300">Remaining</th>
+                                            <th className="px-4 py-3 text-left text-gray-300">Status</th>
+                                            <th className="px-4 py-3 text-left text-gray-300">Opened By</th>
+                                            <th className="px-4 py-3 text-left text-gray-300">Actions</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-700">
+                                        {openedBottles.map((bottle) => (
+                                            <tr key={bottle._id} className="hover:bg-gray-700/50">
+                                                <td className="px-4 py-3 text-white font-medium">{bottle.productName}</td>
+                                                <td className="px-4 py-3 text-gray-400">{bottle.productBrand}</td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`font-bold ${bottle.remainingMl > 0 ? 'text-blue-400' : 'text-red-400'}`}>
+                                                        {bottle.remainingMl}ml / {bottle.mlCapacity}ml
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`badge ${bottle.status === 'active' ? 'badge-success' : 'badge-danger'}`}>
+                                                        {bottle.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-400">{bottle.openedBy}</td>
+                                                <td className="px-4 py-3">
+                                                    <button
+                                                        onClick={() => handleDeleteBottle(bottle._id)}
+                                                        className="btn-danger text-sm px-3 py-1"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 
