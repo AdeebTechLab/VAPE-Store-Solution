@@ -72,7 +72,7 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 px-4 py-4">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-emerald-50 to-gray-100 px-4 py-4">
             <div className="max-w-sm w-full">
                 {/* Logo/Header */}
                 <div className="text-center mb-4">
