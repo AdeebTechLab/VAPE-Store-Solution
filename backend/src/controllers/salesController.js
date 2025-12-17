@@ -54,6 +54,7 @@ const sellProduct = asyncHandler(async (req, res) => {
         pricePerUnit: product.pricePerUnit,
         totalPrice,
         soldByShopkeeperId: req.user.id,
+        soldBy: req.user.username || 'Unknown',
         sessionId,
     });
 
@@ -144,6 +145,7 @@ const sellBulk = asyncHandler(async (req, res) => {
                     pricePerUnit: mlPrice,
                     totalPrice: mlPrice,
                     soldByShopkeeperId: req.user?.id,
+                    soldBy: req.user?.username || 'Unknown',
                     sessionId,
                 });
                 await transaction.save();
@@ -179,6 +181,7 @@ const sellBulk = asyncHandler(async (req, res) => {
                     pricePerUnit: product.pricePerUnit,
                     totalPrice: itemTotal,
                     soldByShopkeeperId: req.user?.id,
+                    soldBy: req.user?.username || 'Unknown',
                     sessionId,
                 });
                 await transaction.save();

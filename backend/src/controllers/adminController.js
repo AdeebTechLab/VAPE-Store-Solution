@@ -43,9 +43,14 @@ const getAllShops = asyncHandler(async (req, res) => {
                     { $group: { _id: null, total: { $sum: '$totalPrice' }, count: { $sum: 1 } } }
                 ]);
 
-                // Get total stock value
+                // Get total stock value (sell price × units)
                 const stockValue = await Product.aggregate([
                     { $group: { _id: null, total: { $sum: { $multiply: ['$units', '$pricePerUnit'] } } } }
+                ]);
+
+                // Get total cost value (cost price × units) for investment calculation
+                const costValue = await Product.aggregate([
+                    { $group: { _id: null, total: { $sum: { $multiply: ['$units', '$costPrice'] } } } }
                 ]);
 
                 return {
@@ -57,12 +62,13 @@ const getAllShops = asyncHandler(async (req, res) => {
                         allTimeSales: allTimeSales[0]?.total || 0,
                         allTimeSalesCount: allTimeSales[0]?.count || 0,
                         totalStockValue: stockValue[0]?.total || 0,
+                        totalCostValue: costValue[0]?.total || 0,
                     },
                 };
             } catch (error) {
                 return {
                     ...shop.toObject(),
-                    stats: { productCount: 0, todaysSales: 0, todaysSalesCount: 0, allTimeSales: 0, allTimeSalesCount: 0, totalStockValue: 0 },
+                    stats: { productCount: 0, todaysSales: 0, todaysSalesCount: 0, allTimeSales: 0, allTimeSalesCount: 0, totalStockValue: 0, totalCostValue: 0 },
                 };
             }
         })
@@ -354,7 +360,7 @@ const saveRecentProduct = asyncHandler(async (req, res) => {
  */
 const downloadSalesReport = asyncHandler(async (req, res) => {
     const { shopId } = req.params;
-    const { from, to, format = 'csv' } = req.query;
+    const { from, to, format = 'csv', shopkeeper = 'all' } = req.query;
 
     if (!from || !to) {
         return res.status(400).json({
@@ -387,15 +393,42 @@ const downloadSalesReport = asyncHandler(async (req, res) => {
     const toDate = new Date(to);
     toDate.setHours(23, 59, 59, 999);
 
-    // Get all transactions in date range
-    const transactions = await Transaction.find({
+    // Build query with optional shopkeeper filter
+    const query = {
         soldAt: { $gte: fromDate, $lte: toDate }
-    }).sort({ soldAt: 1 });
+    };
+
+    // Filter by shopkeeper if not 'all'
+    // Look up shopkeeper by username to get their ID
+    if (shopkeeper !== 'all') {
+        const Shopkeeper = shopConn.model('Shopkeeper', require('../models/Shopkeeper'));
+        const shopkeeperDoc = await Shopkeeper.findOne({ username: shopkeeper });
+        if (shopkeeperDoc) {
+            query.soldByShopkeeperId = shopkeeperDoc._id;
+        } else {
+            // Fallback to matching by soldBy string (for newer transactions)
+            query.soldBy = shopkeeper;
+        }
+    }
+
+    // Get all transactions in date range (filtered by shopkeeper if specified)
+    const transactions = await Transaction.find(query).sort({ soldAt: 1 });
+
+    // Get Shopkeeper model for looking up names
+    const Shopkeeper = shopConn.model('Shopkeeper', require('../models/Shopkeeper'));
 
     // Get product details for each transaction
     const enrichedTransactions = await Promise.all(
         transactions.map(async (tx) => {
             const product = await Product.findById(tx.productId);
+
+            // Get shopkeeper name - try soldBy field first, then lookup by ID
+            let soldByName = tx.soldBy;
+            if (!soldByName || soldByName === 'Unknown') {
+                const shopkeeperDoc = await Shopkeeper.findById(tx.soldByShopkeeperId);
+                soldByName = shopkeeperDoc?.username || 'Unknown';
+            }
+
             return {
                 date: tx.soldAt.toISOString().split('T')[0],
                 time: tx.soldAt.toTimeString().split(' ')[0],
@@ -405,7 +438,7 @@ const downloadSalesReport = asyncHandler(async (req, res) => {
                 quantity: tx.qty,
                 unitPrice: tx.pricePerUnit,
                 totalPrice: tx.totalPrice,
-                soldBy: tx.soldBy || 'Unknown',
+                soldBy: soldByName,
             };
         })
     );

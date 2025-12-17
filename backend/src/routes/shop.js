@@ -14,6 +14,9 @@ router.use(auth, isShopkeeper);
 router.get('/:shopDbName/products', productController.getProducts);
 router.get('/:shopDbName/products/:productId', productController.getProduct);
 
+// Product price update (shopkeeper can update price)
+router.patch('/:shopDbName/products/:productId/price', productController.updateProductPrice);
+
 // Barcode scanning
 router.post('/:shopDbName/scan', productController.searchByBarcode);
 

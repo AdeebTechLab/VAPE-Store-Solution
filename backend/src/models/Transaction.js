@@ -28,6 +28,11 @@ const transactionSchema = new mongoose.Schema({
         ref: 'Shopkeeper',
         required: true,
     },
+    soldBy: {
+        type: String,
+        required: true,
+        default: 'Unknown',
+    },
     sessionId: {
         type: String,
         required: true,

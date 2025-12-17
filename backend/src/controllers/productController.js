@@ -109,7 +109,7 @@ const getProduct = asyncHandler(async (req, res) => {
  */
 const createProduct = asyncHandler(async (req, res) => {
     const { shopId } = req.params;
-    const { name, brand, category, units, pricePerUnit, shortDescription, barcode, mlCapacity, flavour } = req.body;
+    const { name, brand, category, units, pricePerUnit, costPrice, shortDescription, barcode, mlCapacity, flavour } = req.body;
 
     // Get shop info
     const adminConn = await connectAdminDB();
@@ -200,6 +200,7 @@ const createProduct = asyncHandler(async (req, res) => {
         flavour: category === 'E-Liquid' ? (flavour || '') : '',
         units: parseInt(units) || 0,
         pricePerUnit: parseFloat(pricePerUnit),
+        costPrice: parseFloat(costPrice) || 0,
         shortDescription: shortDescription || '',
         imageUrl,
         barcode: barcode || '',
@@ -223,7 +224,7 @@ const createProduct = asyncHandler(async (req, res) => {
  */
 const updateProduct = asyncHandler(async (req, res) => {
     const { shopId, productId } = req.params;
-    const { name, brand, category, units, pricePerUnit, shortDescription, barcode } = req.body;
+    const { name, brand, category, units, pricePerUnit, costPrice, shortDescription, barcode } = req.body;
 
     // Get shop info
     const adminConn = await connectAdminDB();
@@ -256,6 +257,7 @@ const updateProduct = asyncHandler(async (req, res) => {
     if (category) product.category = category;
     if (units !== undefined) product.units = parseInt(units);
     if (pricePerUnit !== undefined) product.pricePerUnit = parseFloat(pricePerUnit);
+    if (costPrice !== undefined) product.costPrice = parseFloat(costPrice);
     if (shortDescription !== undefined) product.shortDescription = shortDescription;
     if (barcode !== undefined) product.barcode = barcode;
 
@@ -372,6 +374,45 @@ const searchByBarcode = asyncHandler(async (req, res) => {
     });
 });
 
+/**
+ * Update product price (Shopkeeper endpoint)
+ * PATCH /api/shop/:shopDbName/products/:productId/price
+ */
+const updateProductPrice = asyncHandler(async (req, res) => {
+    const { shopDbName, productId } = req.params;
+    const { pricePerUnit } = req.body;
+
+    if (pricePerUnit === undefined || pricePerUnit < 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'Valid price is required',
+        });
+    }
+
+    // Connect to shop database
+    const shopConn = await getShopConnection(shopDbName);
+    const Product = shopConn.model('Product', productSchema);
+
+    const product = await Product.findById(productId);
+    if (!product) {
+        return res.status(404).json({
+            success: false,
+            message: 'Product not found',
+        });
+    }
+
+    // Update price
+    const oldPrice = product.pricePerUnit;
+    product.pricePerUnit = pricePerUnit;
+    await product.save();
+
+    res.json({
+        success: true,
+        message: `Price updated from Rs ${oldPrice} to Rs ${pricePerUnit}`,
+        product,
+    });
+});
+
 module.exports = {
     getProducts,
     getProduct,
@@ -379,4 +420,5 @@ module.exports = {
     updateProduct,
     deleteProduct,
     searchByBarcode,
+    updateProductPrice,
 };
