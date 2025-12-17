@@ -28,12 +28,20 @@ ChartJS.register(
     Legend
 );
 
+// Helper to format currency and avoid floating point precision issues
+const formatCurrency = (value) => {
+    // Round to 2 decimal places to fix floating point precision
+    const rounded = Math.round(value * 100) / 100;
+    return rounded.toFixed(2);
+};
+
 const Analytics = () => {
     const [shops, setShops] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedShop, setSelectedShop] = useState(null); // null = All Shops
     const [selectedTimeline, setSelectedTimeline] = useState('all'); // 1w, 2w, 1m, 3m, 1y, all
     const [shopProducts, setShopProducts] = useState([]);
+    const [openedBottles, setOpenedBottles] = useState([]);
     const [loadingProducts, setLoadingProducts] = useState(false);
 
     useEffect(() => {
@@ -43,8 +51,10 @@ const Analytics = () => {
     useEffect(() => {
         if (selectedShop) {
             fetchShopProducts(selectedShop._id);
+            fetchOpenedBottles(selectedShop._id);
         } else {
             setShopProducts([]);
+            setOpenedBottles([]);
         }
     }, [selectedShop]);
 
@@ -72,6 +82,18 @@ const Analytics = () => {
             console.error('Error fetching shop products:', error);
         }
         setLoadingProducts(false);
+    };
+
+    const fetchOpenedBottles = async (shopId) => {
+        try {
+            const response = await api.get(`/admin/shops/${shopId}/opened-bottles`);
+            if (response.data.success) {
+                setOpenedBottles(response.data.openedBottles || []);
+            }
+        } catch (error) {
+            console.error('Error fetching opened bottles:', error);
+            setOpenedBottles([]);
+        }
     };
 
     // Timeline options
@@ -120,25 +142,41 @@ const Analytics = () => {
     // Get data for selected shop or all shops
     const getAnalyticsData = () => {
         if (selectedShop) {
+            // Calculate opened bottles value (remaining ML * price per ML)
+            const openedBottlesValue = openedBottles.reduce((sum, bottle) => {
+                const pricePerMl = bottle.pricePerMl || 0;
+                const remainingMl = bottle.remainingMl || 0;
+                return sum + (pricePerMl * remainingMl);
+            }, 0);
+
+            // Use backend stats for stock and cost values (pre-calculated)
+            const stockFromBackend = selectedShop.stats?.totalStockValue || 0;
+            const costFromBackend = selectedShop.stats?.totalCostValue || 0;
+
             return {
                 totalSales: selectedShop.stats?.allTimeSales || 0,
                 todaysSales: selectedShop.stats?.todaysSales || 0,
                 productCount: selectedShop.stats?.productCount || 0,
-                stockValue: selectedShop.stats?.totalStockValue || 0,
-                totalCost: shopProducts.reduce((sum, p) => sum + ((p.costPrice || 0) * (p.units || 0)), 0),
-                potentialProfit: shopProducts.reduce((sum, p) => {
-                    const profit = calculateProductProfit(p);
-                    return sum + profit.potentialProfit;
-                }, 0),
+                stockValue: stockFromBackend + openedBottlesValue,
+                openedBottlesValue: openedBottlesValue,
+                openedBottlesCount: openedBottles.length,
+                totalCost: costFromBackend,
+                potentialProfit: stockFromBackend - costFromBackend,
             };
         } else {
+            // For all shops, sum up stats from backend
+            const totalCost = shops.reduce((sum, s) => sum + (s.stats?.totalCostValue || 0), 0);
+            const totalStock = shops.reduce((sum, s) => sum + (s.stats?.totalStockValue || 0), 0);
+
             return {
                 totalSales: shops.reduce((sum, s) => sum + (s.stats?.allTimeSales || 0), 0),
                 todaysSales: shops.reduce((sum, s) => sum + (s.stats?.todaysSales || 0), 0),
                 productCount: shops.reduce((sum, s) => sum + (s.stats?.productCount || 0), 0),
-                stockValue: shops.reduce((sum, s) => sum + (s.stats?.totalStockValue || 0), 0),
-                totalCost: 0,
-                potentialProfit: 0,
+                stockValue: totalStock,
+                openedBottlesValue: 0,
+                openedBottlesCount: 0,
+                totalCost: totalCost,
+                potentialProfit: totalStock - totalCost,
             };
         }
     };
@@ -240,8 +278,8 @@ const Analytics = () => {
                         <button
                             onClick={() => setSelectedShop(null)}
                             className={`px-4 py-2 rounded-lg font-medium transition-all ${selectedShop === null
-                                    ? 'bg-primary text-white shadow-lg shadow-primary/30'
-                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                ? 'bg-primary text-white shadow-lg shadow-primary/30'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                 }`}
                         >
                             🏪 All Shops
@@ -251,8 +289,8 @@ const Analytics = () => {
                                 key={shop._id}
                                 onClick={() => setSelectedShop(shop)}
                                 className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${selectedShop?._id === shop._id
-                                        ? 'bg-primary text-white shadow-lg shadow-primary/30'
-                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                    ? 'bg-primary text-white shadow-lg shadow-primary/30'
+                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                     }`}
                             >
                                 <span
@@ -275,8 +313,8 @@ const Analytics = () => {
                                     key={option.value}
                                     onClick={() => setSelectedTimeline(option.value)}
                                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${selectedTimeline === option.value
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                         }`}
                                 >
                                     {option.label}
@@ -289,41 +327,74 @@ const Analytics = () => {
                     </div>
                 )}
 
-                {/* Summary Cards */}
-                <div className={`grid gap-4 mb-8 ${selectedShop ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6' : 'grid-cols-1 md:grid-cols-4'}`}>
-                    {!selectedShop && (
-                        <div className="card bg-gradient-to-br from-purple-900/50 to-purple-600/30 border border-purple-500/30">
-                            <p className="text-gray-400 text-sm">Total Shops</p>
-                            <p className="text-3xl font-bold text-purple-400">{shops.length}</p>
+                {/* Simple Summary Cards - 3 Key Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    {/* Total Investment */}
+                    <div className="card bg-gradient-to-br from-red-900/50 to-red-600/30 border border-red-500/30 p-6">
+                        <div className="flex items-center gap-3 mb-2">
+                            <span className="text-3xl">💰</span>
+                            <p className="text-gray-400">Total Investment</p>
                         </div>
-                    )}
-                    <div className="card bg-gradient-to-br from-blue-900/50 to-blue-600/30 border border-blue-500/30">
-                        <p className="text-gray-400 text-sm">Today's Sales</p>
-                        <p className="text-2xl font-bold text-blue-400">Rs {analyticsData.todaysSales.toFixed(2)}</p>
+                        <p className="text-3xl font-bold text-red-400">Rs {formatCurrency(analyticsData.totalCost)}</p>
+                        <p className="text-sm text-gray-500 mt-2">
+                            {selectedShop ? `${selectedShop.name}` : `All ${shops.length} Shops`}
+                        </p>
                     </div>
-                    <div className="card bg-gradient-to-br from-green-900/50 to-green-600/30 border border-green-500/30">
-                        <p className="text-gray-400 text-sm">All-Time Sales</p>
-                        <p className="text-2xl font-bold text-green-400">Rs {analyticsData.totalSales.toFixed(2)}</p>
+
+                    {/* Total Sales */}
+                    <div className="card bg-gradient-to-br from-blue-900/50 to-blue-600/30 border border-blue-500/30 p-6">
+                        <div className="flex items-center gap-3 mb-2">
+                            <span className="text-3xl">📈</span>
+                            <p className="text-gray-400">Total Sales</p>
+                        </div>
+                        <p className="text-3xl font-bold text-blue-400">Rs {formatCurrency(analyticsData.totalSales)}</p>
+                        <p className="text-sm text-gray-500 mt-2">
+                            Today: Rs {formatCurrency(analyticsData.todaysSales)}
+                        </p>
                     </div>
-                    <div className="card bg-gradient-to-br from-cyan-900/50 to-cyan-600/30 border border-cyan-500/30">
+
+                    {/* Total Profit */}
+                    <div className="card bg-gradient-to-br from-green-900/50 to-green-600/30 border border-green-500/30 p-6">
+                        <div className="flex items-center gap-3 mb-2">
+                            <span className="text-3xl">🎯</span>
+                            <p className="text-gray-400">Total Profit</p>
+                        </div>
+                        <p className={`text-3xl font-bold ${(analyticsData.totalSales - analyticsData.totalCost) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            Rs {formatCurrency(analyticsData.totalSales - analyticsData.totalCost)}
+                        </p>
+                        <p className="text-sm text-gray-500 mt-2">
+                            Sales - Investment = Profit
+                        </p>
+                    </div>
+                </div>
+
+                {/* Quick Stats Row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div className="card p-4 text-center">
                         <p className="text-gray-400 text-sm">Products</p>
                         <p className="text-2xl font-bold text-cyan-400">{analyticsData.productCount}</p>
                     </div>
-                    <div className="card bg-gradient-to-br from-yellow-900/50 to-yellow-600/30 border border-yellow-500/30">
+                    <div className="card p-4 text-center">
                         <p className="text-gray-400 text-sm">Stock Value</p>
-                        <p className="text-2xl font-bold text-yellow-400">Rs {analyticsData.stockValue.toFixed(2)}</p>
+                        <p className="text-2xl font-bold text-yellow-400">Rs {formatCurrency(analyticsData.stockValue)}</p>
                     </div>
                     {selectedShop && (
                         <>
-                            <div className="card bg-gradient-to-br from-red-900/50 to-red-600/30 border border-red-500/30">
-                                <p className="text-gray-400 text-sm">Total Cost</p>
-                                <p className="text-2xl font-bold text-red-400">Rs {analyticsData.totalCost.toFixed(2)}</p>
+                            <div className="card p-4 text-center">
+                                <p className="text-gray-400 text-sm">🧴 Opened Bottles</p>
+                                <p className="text-2xl font-bold text-pink-400">{analyticsData.openedBottlesCount}</p>
                             </div>
-                            <div className="card bg-gradient-to-br from-emerald-900/50 to-emerald-600/30 border border-emerald-500/30">
-                                <p className="text-gray-400 text-sm">💰 Potential Profit</p>
-                                <p className="text-2xl font-bold text-emerald-400">Rs {analyticsData.potentialProfit.toFixed(2)}</p>
+                            <div className="card p-4 text-center">
+                                <p className="text-gray-400 text-sm">Bottles Value</p>
+                                <p className="text-2xl font-bold text-pink-400">Rs {formatCurrency(analyticsData.openedBottlesValue)}</p>
                             </div>
                         </>
+                    )}
+                    {!selectedShop && (
+                        <div className="card p-4 text-center col-span-2">
+                            <p className="text-gray-400 text-sm">Total Shops</p>
+                            <p className="text-2xl font-bold text-purple-400">{shops.length}</p>
+                        </div>
                     )}
                 </div>
 
@@ -390,7 +461,7 @@ const Analytics = () => {
                                                         <td className="px-4 py-3 text-white font-medium">{product.name}</td>
                                                         <td className="px-4 py-3">
                                                             <span className={`badge ${product.category === 'Device' ? 'badge-info' :
-                                                                    product.category === 'Coil' ? 'badge-warning' : 'badge-success'
+                                                                product.category === 'Coil' ? 'badge-warning' : 'badge-success'
                                                                 }`}>
                                                                 {product.category}
                                                             </span>
@@ -421,6 +492,48 @@ const Analytics = () => {
                                 </div>
                             )}
                         </div>
+
+                        {/* Opened Bottles Table */}
+                        {openedBottles.length > 0 && (
+                            <div className="card">
+                                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                                    <span className="text-2xl">🧴</span>
+                                    Opened Bottles - {selectedShop.name}
+                                </h2>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-700">
+                                            <tr>
+                                                <th className="px-4 py-3 text-left text-gray-300">Product</th>
+                                                <th className="px-4 py-3 text-right text-gray-300">Capacity</th>
+                                                <th className="px-4 py-3 text-right text-gray-300">Remaining ML</th>
+                                                <th className="px-4 py-3 text-right text-gray-300">Price/ML</th>
+                                                <th className="px-4 py-3 text-right text-gray-300">Remaining Value</th>
+                                                <th className="px-4 py-3 text-left text-gray-300">Opened By</th>
+                                                <th className="px-4 py-3 text-left text-gray-300">Opened At</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-700">
+                                            {openedBottles.map(bottle => (
+                                                <tr key={bottle._id} className="hover:bg-gray-700/50">
+                                                    <td className="px-4 py-3 text-white font-medium">{bottle.productName}</td>
+                                                    <td className="px-4 py-3 text-right text-gray-400">{bottle.mlCapacity}ml</td>
+                                                    <td className="px-4 py-3 text-right text-pink-400 font-semibold">{bottle.remainingMl}ml</td>
+                                                    <td className="px-4 py-3 text-right text-blue-400">Rs {(bottle.pricePerMl || 0).toFixed(2)}</td>
+                                                    <td className="px-4 py-3 text-right text-green-400 font-bold">
+                                                        Rs {((bottle.pricePerMl || 0) * (bottle.remainingMl || 0)).toFixed(2)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-gray-400">{bottle.openedBy || 'Unknown'}</td>
+                                                    <td className="px-4 py-3 text-gray-500 text-sm">
+                                                        {new Date(bottle.openedAt).toLocaleDateString()}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </>
                 ) : (
                     <>

@@ -31,6 +31,11 @@ const Home = () => {
     const [showCart, setShowCart] = useState(false);
     const [discountPercent, setDiscountPercent] = useState(0);
 
+    // Price edit state
+    const [editingPriceProduct, setEditingPriceProduct] = useState(null);
+    const [newPrice, setNewPrice] = useState('');
+    const [priceUpdateLoading, setPriceUpdateLoading] = useState(false);
+
     // QR Scan Mode state
     const [isScanMode, setIsScanMode] = useState(false);
     const scanBufferRef = useRef('');
@@ -117,6 +122,43 @@ const Home = () => {
         }
 
         setFilteredProducts(filtered);
+    };
+
+    // Handle price update
+    const handleUpdatePrice = async () => {
+        if (!editingPriceProduct || !newPrice) return;
+
+        const priceValue = parseFloat(newPrice);
+        if (isNaN(priceValue) || priceValue < 0) {
+            showMessage('error', 'Please enter a valid price');
+            return;
+        }
+
+        setPriceUpdateLoading(true);
+        try {
+            const shopDbName = user?.shopDbName || 'shop_db_1';
+            const response = await api.patch(
+                `/shop/${shopDbName}/products/${editingPriceProduct._id}/price`,
+                { pricePerUnit: priceValue }
+            );
+
+            if (response.data.success) {
+                // Update the product in both lists
+                setProducts(products.map(p =>
+                    p._id === editingPriceProduct._id ? { ...p, pricePerUnit: priceValue } : p
+                ));
+                setFilteredProducts(filteredProducts.map(p =>
+                    p._id === editingPriceProduct._id ? { ...p, pricePerUnit: priceValue } : p
+                ));
+                showMessage('success', `Price updated to Rs ${priceValue}`);
+                setEditingPriceProduct(null);
+                setNewPrice('');
+            }
+        } catch (error) {
+            showMessage('error', error.response?.data?.message || 'Failed to update price');
+        } finally {
+            setPriceUpdateLoading(false);
+        }
     };
 
     const handleScan = async (code) => {
@@ -627,7 +669,22 @@ const Home = () => {
                                 <p className="text-xs text-gray-400 truncate">{product.brand}</p>
 
                                 <div className="flex items-center justify-between mt-1 mb-2">
-                                    <span className="text-base font-bold text-primary">Rs {product.pricePerUnit.toFixed(2)}</span>
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-base font-bold text-primary">Rs {product.pricePerUnit.toFixed(2)}</span>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditingPriceProduct(product);
+                                                setNewPrice(product.pricePerUnit.toString());
+                                            }}
+                                            className="p-1 text-gray-400 hover:text-yellow-400 transition-colors"
+                                            title="Edit price"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                     <span className={`text-xs px-1.5 py-0.5 rounded ${product.units > 10 ? 'bg-green-900 text-green-400' :
                                         product.units > 0 ? 'bg-yellow-900 text-yellow-400' : 'bg-red-900 text-red-400'
                                         }`}>
@@ -733,6 +790,46 @@ const Home = () => {
                                     }`}
                             >
                                 Add {mlToSell}ml to Cart
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Price Edit Modal */}
+            {editingPriceProduct && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/60" onClick={() => setEditingPriceProduct(null)}></div>
+                    <div className="relative bg-gray-800 rounded-xl p-6 w-full max-w-sm mx-4 border border-gray-700">
+                        <h3 className="text-lg font-bold text-white mb-2">Edit Price</h3>
+                        <p className="text-gray-400 text-sm mb-4">{editingPriceProduct.name}</p>
+
+                        <div className="mb-4">
+                            <label className="block text-sm text-gray-300 mb-2">New Price (Rs)</label>
+                            <input
+                                type="number"
+                                value={newPrice}
+                                onChange={(e) => setNewPrice(e.target.value)}
+                                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white text-lg focus:border-yellow-500 focus:outline-none"
+                                min="0"
+                                step="0.01"
+                                autoFocus
+                            />
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setEditingPriceProduct(null)}
+                                className="flex-1 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleUpdatePrice}
+                                disabled={priceUpdateLoading}
+                                className="flex-1 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-medium"
+                            >
+                                {priceUpdateLoading ? 'Saving...' : 'Save Price'}
                             </button>
                         </div>
                     </div>

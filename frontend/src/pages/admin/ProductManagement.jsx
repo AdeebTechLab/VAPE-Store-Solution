@@ -339,6 +339,7 @@ const ProductManagement = () => {
         data.append('category', formData.category);
         data.append('units', formData.units);
         data.append('pricePerUnit', formData.pricePerUnit);
+        data.append('costPrice', formData.costPrice);
         data.append('shortDescription', formData.shortDescription);
         data.append('barcode', formData.barcode);
         if (formData.category === 'E-Liquid') {

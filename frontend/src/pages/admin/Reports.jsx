@@ -5,9 +5,12 @@ import api from '../../services/api';
 const Reports = () => {
     const [shops, setShops] = useState([]);
     const [selectedShop, setSelectedShop] = useState('');
+    const [shopkeepers, setShopkeepers] = useState([]);
+    const [selectedShopkeeper, setSelectedShopkeeper] = useState('all');
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
     const [loading, setLoading] = useState(false);
+    const [loadingShopkeepers, setLoadingShopkeepers] = useState(false);
     const [preview, setPreview] = useState(null);
     const [error, setError] = useState('');
 
@@ -36,6 +39,29 @@ const Reports = () => {
         }
     };
 
+    // Fetch shopkeepers when shop changes
+    useEffect(() => {
+        if (selectedShop) {
+            fetchShopkeepers(selectedShop);
+        }
+    }, [selectedShop]);
+
+    const fetchShopkeepers = async (shopId) => {
+        setLoadingShopkeepers(true);
+        setSelectedShopkeeper('all');
+        try {
+            const response = await api.get(`/admin/shops/${shopId}/shopkeepers`);
+            if (response.data.success) {
+                setShopkeepers(response.data.shopkeepers || []);
+            }
+        } catch (error) {
+            console.error('Error fetching shopkeepers:', error);
+            setShopkeepers([]);
+        } finally {
+            setLoadingShopkeepers(false);
+        }
+    };
+
     const handlePreview = async () => {
         if (!selectedShop || !fromDate || !toDate) {
             setError('Please select shop and date range');
@@ -48,7 +74,7 @@ const Reports = () => {
 
         try {
             const response = await api.get(
-                `/admin/shops/${selectedShop}/sales-report?from=${fromDate}&to=${toDate}&format=json`
+                `/admin/shops/${selectedShop}/sales-report?from=${fromDate}&to=${toDate}&format=json&shopkeeper=${selectedShopkeeper}`
             );
             if (response.data.success) {
                 setPreview(response.data);
@@ -71,7 +97,7 @@ const Reports = () => {
 
         try {
             const response = await api.get(
-                `/admin/shops/${selectedShop}/sales-report?from=${fromDate}&to=${toDate}&format=excel`,
+                `/admin/shops/${selectedShop}/sales-report?from=${fromDate}&to=${toDate}&format=excel&shopkeeper=${selectedShopkeeper}`,
                 { responseType: 'blob' }
             );
 
@@ -122,7 +148,7 @@ const Reports = () => {
                 <div className="card mb-6">
                     <h2 className="text-xl font-bold text-white mb-4">Generate Report</h2>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                         {/* Shop Selection */}
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">Select Shop</label>
@@ -134,6 +160,27 @@ const Reports = () => {
                                 {shops.map((shop) => (
                                     <option key={shop._id} value={shop._id}>
                                         {shop.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Shopkeeper Selection */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                                Select Shopkeeper
+                                {loadingShopkeepers && <span className="text-gray-500 ml-2">(loading...)</span>}
+                            </label>
+                            <select
+                                value={selectedShopkeeper}
+                                onChange={(e) => setSelectedShopkeeper(e.target.value)}
+                                className="input"
+                                disabled={loadingShopkeepers}
+                            >
+                                <option value="all">👥 All Shopkeepers</option>
+                                {shopkeepers.map((sk) => (
+                                    <option key={sk._id} value={sk.username}>
+                                        {sk.username}
                                     </option>
                                 ))}
                             </select>
