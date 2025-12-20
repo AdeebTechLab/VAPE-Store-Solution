@@ -22,12 +22,12 @@ const ProductManagement = () => {
         name: '',
         brand: '',
         category: 'Device',
-        units: 0,
-        pricePerUnit: 0,
-        costPrice: 0,
+        units: 1,
+        pricePerUnit: '',
+        costPrice: '',
         shortDescription: '',
         barcode: '',
-        mlCapacity: 0,
+        mlCapacity: '',
         flavour: '',
     });
     const [imageFile, setImageFile] = useState(null);
@@ -376,11 +376,13 @@ const ProductManagement = () => {
                     name: '',
                     brand: '',
                     category: 'Device',
-                    units: 0,
-                    pricePerUnit: 0,
+                    units: 1,
+                    pricePerUnit: '',
+                    costPrice: '',
                     shortDescription: '',
                     barcode: '',
-                    mlCapacity: 0,
+                    mlCapacity: '',
+                    flavour: '',
                 });
                 setImageFile(null);
                 setShowAddForm(false);
@@ -538,15 +540,31 @@ const ProductManagement = () => {
                                 )}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-2">Stock Quantity *</label>
-                                    <input
-                                        type="number"
-                                        value={formData.units}
-                                        onChange={(e) => setFormData({ ...formData, units: Number(e.target.value) })}
-                                        className="input"
-                                        placeholder="e.g., 50"
-                                        min="0"
-                                        required
-                                    />
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, units: Math.max(1, (Number(formData.units) || 1) - 1) })}
+                                            className="w-10 h-10 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold text-xl transition-colors"
+                                        >
+                                            -
+                                        </button>
+                                        <input
+                                            type="number"
+                                            value={formData.units}
+                                            onChange={(e) => setFormData({ ...formData, units: Number(e.target.value) || '' })}
+                                            className="input text-center flex-1"
+                                            placeholder="1"
+                                            min="1"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, units: (Number(formData.units) || 0) + 1 })}
+                                            className="w-10 h-10 bg-primary hover:bg-primary-dark text-white rounded-lg font-bold text-xl transition-colors"
+                                        >
+                                            +
+                                        </button>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-2">Price per Unit ($) *</label>

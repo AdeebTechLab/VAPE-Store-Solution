@@ -14,6 +14,14 @@ const Reports = () => {
     const [preview, setPreview] = useState(null);
     const [error, setError] = useState('');
 
+    // Session reconciliation state (separate from sales report)
+    const [sessionShop, setSessionShop] = useState('all');
+    const [sessionReports, setSessionReports] = useState([]);
+    const [loadingSessions, setLoadingSessions] = useState(false);
+    const [depositInputs, setDepositInputs] = useState({}); // { reportId: amount }
+    const [depositingId, setDepositingId] = useState(null);
+    const [sessionError, setSessionError] = useState('');
+
     useEffect(() => {
         fetchShops();
         // Set default dates (last 7 days)
@@ -39,12 +47,19 @@ const Reports = () => {
         }
     };
 
-    // Fetch shopkeepers when shop changes
+    // Fetch shopkeepers when shop changes (for sales report)
     useEffect(() => {
         if (selectedShop) {
             fetchShopkeepers(selectedShop);
         }
     }, [selectedShop]);
+
+    // Fetch session reports when sessionShop changes or when shops are loaded
+    useEffect(() => {
+        if (shops.length > 0) {
+            fetchSessionReports();
+        }
+    }, [sessionShop, shops]);
 
     const fetchShopkeepers = async (shopId) => {
         setLoadingShopkeepers(true);
@@ -59,6 +74,54 @@ const Reports = () => {
             setShopkeepers([]);
         } finally {
             setLoadingShopkeepers(false);
+        }
+    };
+
+    const fetchSessionReports = async () => {
+        setLoadingSessions(true);
+        setSessionError('');
+        try {
+            let allReports = [];
+
+            if (sessionShop === 'all') {
+                // Fetch from all shops
+                for (const shop of shops) {
+                    try {
+                        const response = await api.get(`/admin/shops/${shop._id}/session-reports?limit=50`);
+                        if (response.data.success) {
+                            const reportsWithShop = (response.data.reports || []).map(r => ({
+                                ...r,
+                                shopName: shop.name,
+                                shopId: shop._id,
+                            }));
+                            allReports = [...allReports, ...reportsWithShop];
+                        }
+                    } catch (err) {
+                        console.error(`Error fetching sessions for shop ${shop.name}:`, err);
+                    }
+                }
+                // Sort by endTime descending
+                allReports.sort((a, b) => new Date(b.endTime) - new Date(a.endTime));
+            } else {
+                // Fetch from specific shop
+                const shop = shops.find(s => s._id === sessionShop);
+                const response = await api.get(`/admin/shops/${sessionShop}/session-reports?limit=50`);
+                if (response.data.success) {
+                    allReports = (response.data.reports || []).map(r => ({
+                        ...r,
+                        shopName: shop?.name || 'Unknown',
+                        shopId: sessionShop,
+                    }));
+                }
+            }
+
+            setSessionReports(allReports);
+        } catch (error) {
+            console.error('Error fetching session reports:', error);
+            setSessionError('Failed to load session reports');
+            setSessionReports([]);
+        } finally {
+            setLoadingSessions(false);
         }
     };
 
@@ -122,6 +185,92 @@ const Reports = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Session reconciliation handlers
+    const handleDepositInputChange = (reportId, value) => {
+        setDepositInputs(prev => ({
+            ...prev,
+            [reportId]: value
+        }));
+    };
+
+    const handleDeposit = async (session) => {
+        const depositAmount = parseFloat(depositInputs[session._id]) || 0;
+
+        if (depositAmount <= 0) {
+            alert('Please enter a valid deposit amount');
+            return;
+        }
+
+        // Calculate remaining balance (what's still owed)
+        const currentRemaining = session.totalAmount - (session.cashSubmitted || 0);
+
+        if (depositAmount > currentRemaining) {
+            alert(`Cannot deposit more than remaining balance (Rs ${currentRemaining.toFixed(2)})`);
+            return;
+        }
+
+        setDepositingId(session._id);
+
+        try {
+            // New total cash submitted = current + deposit
+            const newCashSubmitted = (session.cashSubmitted || 0) + depositAmount;
+
+            const response = await api.put(
+                `/admin/shops/${session.shopId}/session-reports/${session._id}/reconcile`,
+                { cashSubmitted: newCashSubmitted }
+            );
+
+            if (response.data.success) {
+                // Update the session in state
+                setSessionReports(prev =>
+                    prev.map(s =>
+                        s._id === session._id
+                            ? {
+                                ...s,
+                                cashSubmitted: response.data.report.cashSubmitted,
+                                remainingBalance: response.data.report.remainingBalance,
+                                isReconciled: response.data.report.isReconciled,
+                                reconciledAt: response.data.report.reconciledAt,
+                            }
+                            : s
+                    )
+                );
+                // Clear input
+                setDepositInputs(prev => ({
+                    ...prev,
+                    [session._id]: ''
+                }));
+            }
+        } catch (error) {
+            alert('Failed to record deposit');
+        } finally {
+            setDepositingId(null);
+        }
+    };
+
+    const handleDeleteSession = async (session) => {
+        if (!confirm('Are you sure you want to delete this session report? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            await api.delete(`/admin/shops/${session.shopId}/session-reports/${session._id}`);
+            setSessionReports(prev => prev.filter(s => s._id !== session._id));
+        } catch (error) {
+            alert('Failed to delete session report');
+        }
+    };
+
+    const formatDateTime = (date) => {
+        return new Date(date).toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
     };
 
     return (
@@ -273,7 +422,7 @@ const Reports = () => {
 
                 {/* Report Preview */}
                 {preview && (
-                    <div className="card">
+                    <div className="card mb-6">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-bold text-white">Report Preview</h2>
                             <div className="text-right">
@@ -295,7 +444,7 @@ const Reports = () => {
                             </div>
                             <div className="bg-gray-700/50 p-4 rounded-lg text-center">
                                 <p className="text-gray-400 text-sm">Total Sales</p>
-                                <p className="text-3xl font-bold text-green-400">${preview.summary.totalSales.toFixed(2)}</p>
+                                <p className="text-3xl font-bold text-green-400">Rs {preview.summary.totalSales.toFixed(2)}</p>
                             </div>
                         </div>
 
@@ -324,8 +473,8 @@ const Reports = () => {
                                                     <span className="badge badge-info">{tx.category}</span>
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-300">{tx.quantity}</td>
-                                                <td className="px-4 py-3 text-gray-300">${tx.unitPrice.toFixed(2)}</td>
-                                                <td className="px-4 py-3 text-green-400 font-semibold">${tx.totalPrice.toFixed(2)}</td>
+                                                <td className="px-4 py-3 text-gray-300">Rs {tx.unitPrice.toFixed(2)}</td>
+                                                <td className="px-4 py-3 text-green-400 font-semibold">Rs {tx.totalPrice.toFixed(2)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -343,6 +492,154 @@ const Reports = () => {
                         )}
                     </div>
                 )}
+
+                {/* Session Reconciliation Section */}
+                <div className="card">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                        <div>
+                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                💰 Session Reconciliation
+                            </h2>
+                            <p className="text-gray-400 text-sm mt-1">
+                                Track cash deposits from shopkeepers for each session
+                            </p>
+                        </div>
+
+                        {/* Shop filter for sessions */}
+                        <div className="flex items-center gap-2">
+                            <label className="text-sm text-gray-400">Filter by Shop:</label>
+                            <select
+                                value={sessionShop}
+                                onChange={(e) => setSessionShop(e.target.value)}
+                                className="input w-48"
+                            >
+                                <option value="all">🏪 All Shops</option>
+                                {shops.map((shop) => (
+                                    <option key={shop._id} value={shop._id}>
+                                        {shop.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {sessionError && (
+                        <div className="mb-4 p-3 bg-red-900/50 border border-red-700 text-red-400 rounded-lg">
+                            {sessionError}
+                        </div>
+                    )}
+
+                    {loadingSessions ? (
+                        <div className="text-center py-12 text-gray-400">
+                            <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+                            Loading session reports...
+                        </div>
+                    ) : sessionReports.length === 0 ? (
+                        <div className="text-center py-12 text-gray-400">
+                            <svg className="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <p>No session reports found</p>
+                            <p className="text-sm text-gray-500 mt-1">Reports are created when shopkeepers logout</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-gray-700">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-gray-300">Shopkeeper</th>
+                                        {sessionShop === 'all' && (
+                                            <th className="px-4 py-3 text-left text-gray-300">Shop</th>
+                                        )}
+                                        <th className="px-4 py-3 text-left text-gray-300">Date & Time</th>
+                                        <th className="px-4 py-3 text-right text-gray-300">Total Sales</th>
+                                        <th className="px-4 py-3 text-right text-gray-300">Deposited</th>
+                                        <th className="px-4 py-3 text-right text-gray-300">Remaining</th>
+                                        <th className="px-4 py-3 text-center text-gray-300">Add Deposit</th>
+                                        <th className="px-4 py-3 text-center text-gray-300">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-700">
+                                    {sessionReports.map((session) => {
+                                        const remaining = session.totalAmount - (session.cashSubmitted || 0);
+                                        const isFullyPaid = remaining <= 0;
+
+                                        return (
+                                            <tr key={session._id} className={`hover:bg-gray-700/50 ${isFullyPaid ? 'bg-green-900/10' : ''}`}>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center text-primary font-bold">
+                                                            {session.shopkeeperUsername?.charAt(0).toUpperCase() || '?'}
+                                                        </div>
+                                                        <span className="text-white font-medium">{session.shopkeeperUsername}</span>
+                                                    </div>
+                                                </td>
+                                                {sessionShop === 'all' && (
+                                                    <td className="px-4 py-3 text-gray-300">
+                                                        <span className="px-2 py-1 bg-gray-700 rounded text-sm">{session.shopName}</span>
+                                                    </td>
+                                                )}
+                                                <td className="px-4 py-3 text-gray-300">
+                                                    <div>{formatDateTime(session.endTime)}</div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {session.totalItemsSold || 0} items sold
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-green-400 font-semibold">
+                                                    Rs {session.totalAmount?.toFixed(2) || '0.00'}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-blue-400 font-medium">
+                                                    Rs {(session.cashSubmitted || 0).toFixed(2)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <span className={`font-semibold ${remaining > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                                        Rs {remaining.toFixed(2)}
+                                                    </span>
+                                                    {isFullyPaid && (
+                                                        <span className="ml-2 text-green-500">✓</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {!isFullyPaid && (
+                                                        <div className="flex items-center gap-2 justify-center">
+                                                            <input
+                                                                type="number"
+                                                                placeholder="Amount"
+                                                                value={depositInputs[session._id] || ''}
+                                                                onChange={(e) => handleDepositInputChange(session._id, e.target.value)}
+                                                                className="w-24 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-right text-sm"
+                                                                min="0"
+                                                                max={remaining}
+                                                            />
+                                                            <button
+                                                                onClick={() => handleDeposit(session)}
+                                                                disabled={depositingId === session._id || !depositInputs[session._id]}
+                                                                className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded text-sm transition-colors"
+                                                            >
+                                                                {depositingId === session._id ? '...' : 'Deposit'}
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                    {isFullyPaid && (
+                                                        <span className="text-green-400 text-sm">Fully Paid</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <button
+                                                        onClick={() => handleDeleteSession(session)}
+                                                        className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
