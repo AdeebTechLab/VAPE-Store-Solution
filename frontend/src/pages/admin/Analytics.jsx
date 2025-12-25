@@ -149,9 +149,12 @@ const Analytics = () => {
                 return sum + (pricePerMl * remainingMl);
             }, 0);
 
-            // Use backend stats for stock and cost values (pre-calculated)
+            // Use backend stats
             const stockFromBackend = selectedShop.stats?.totalStockValue || 0;
-            const costFromBackend = selectedShop.stats?.totalCostValue || 0;
+            // Historical investment from backend (only increases when products added)
+            const historicalInvestment = selectedShop.stats?.totalHistoricalInvestment || 0;
+            // Total profit from backend: (sellPrice - costPrice) × qty for all sold items
+            const profit = selectedShop.stats?.totalProfit || 0;
 
             return {
                 totalSales: selectedShop.stats?.allTimeSales || 0,
@@ -160,12 +163,13 @@ const Analytics = () => {
                 stockValue: stockFromBackend + openedBottlesValue,
                 openedBottlesValue: openedBottlesValue,
                 openedBottlesCount: openedBottles.length,
-                totalCost: costFromBackend,
-                potentialProfit: stockFromBackend - costFromBackend,
+                totalInvestment: historicalInvestment, // Total Investment (only increases)
+                totalProfit: profit, // Actual profit from sales
             };
         } else {
             // For all shops, sum up stats from backend
-            const totalCost = shops.reduce((sum, s) => sum + (s.stats?.totalCostValue || 0), 0);
+            const totalInvestment = shops.reduce((sum, s) => sum + (s.stats?.totalHistoricalInvestment || 0), 0);
+            const totalProfit = shops.reduce((sum, s) => sum + (s.stats?.totalProfit || 0), 0);
             const totalStock = shops.reduce((sum, s) => sum + (s.stats?.totalStockValue || 0), 0);
 
             return {
@@ -175,8 +179,8 @@ const Analytics = () => {
                 stockValue: totalStock,
                 openedBottlesValue: 0,
                 openedBottlesCount: 0,
-                totalCost: totalCost,
-                potentialProfit: totalStock - totalCost,
+                totalInvestment: totalInvestment, // Total Investment (only increases)
+                totalProfit: totalProfit, // Actual profit from sales
             };
         }
     };
@@ -335,7 +339,7 @@ const Analytics = () => {
                             <span className="text-3xl">💰</span>
                             <p className="text-gray-400">Total Investment</p>
                         </div>
-                        <p className="text-3xl font-bold text-red-400">Rs {formatCurrency(analyticsData.totalCost)}</p>
+                        <p className="text-3xl font-bold text-red-400">Rs {formatCurrency(analyticsData.totalInvestment)}</p>
                         <p className="text-sm text-gray-500 mt-2">
                             {selectedShop ? `${selectedShop.name}` : `All ${shops.length} Shops`}
                         </p>
@@ -359,11 +363,11 @@ const Analytics = () => {
                             <span className="text-3xl">🎯</span>
                             <p className="text-gray-400">Total Profit</p>
                         </div>
-                        <p className={`text-3xl font-bold ${(analyticsData.totalSales - analyticsData.totalCost) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            Rs {formatCurrency(analyticsData.totalSales - analyticsData.totalCost)}
+                        <p className={`text-3xl font-bold ${analyticsData.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            Rs {formatCurrency(analyticsData.totalProfit)}
                         </p>
                         <p className="text-sm text-gray-500 mt-2">
-                            Sales - Investment = Profit
+                            (Sell Price - Cost Price) × Qty
                         </p>
                     </div>
                 </div>

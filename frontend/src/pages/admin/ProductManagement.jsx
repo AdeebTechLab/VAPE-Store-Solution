@@ -532,35 +532,61 @@ const ProductManagement = () => {
                                         </button>
                                     </div>
                                 </div>
+                                {/* Cost Price - FIRST (Buying Price) */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Price per Unit ($) *</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        value={formData.pricePerUnit}
-                                        onChange={(e) => setFormData({ ...formData, pricePerUnit: Number(e.target.value) })}
-                                        className="input"
-                                        placeholder="e.g., 29.99"
-                                        min="0"
-                                        required
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">Selling price (visible to shopkeepers)</p>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Cost Price (Rs)
-                                        <span className="text-xs text-yellow-400 ml-1">📊 For Analytics</span>
+                                    <label className="block text-sm font-bold text-yellow-400 mb-2">
+                                        💰 Cost Price (Rs) - BUYING PRICE *
                                     </label>
                                     <input
                                         type="number"
-                                        step="0.01"
+                                        step="1"
                                         value={formData.costPrice}
                                         onChange={(e) => setFormData({ ...formData, costPrice: Number(e.target.value) })}
                                         className="input"
-                                        placeholder="e.g., 15.00"
+                                        placeholder="e.g., 500"
                                         min="0"
+                                        required
                                     />
-                                    <p className="text-xs text-yellow-500 mt-1">🔒 Hidden from shopkeepers - used for profit calculation</p>
+                                    <p className="text-xs text-yellow-500 mt-1 font-medium">
+                                        ⬆️ Price at which you BUY this product from supplier (hidden from shopkeepers)
+                                    </p>
+                                </div>
+
+                                {/* Price Per Unit - SECOND (Selling Price) */}
+                                <div>
+                                    <label className="block text-sm font-bold text-green-400 mb-2">
+                                        🏷️ Sell Price (Rs) - SELLING PRICE *
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="1"
+                                        value={formData.pricePerUnit}
+                                        onChange={(e) => {
+                                            const newPrice = Number(e.target.value);
+                                            // Validate: sell price should be >= cost price
+                                            if (formData.costPrice && newPrice < formData.costPrice) {
+                                                // Show warning but allow input
+                                            }
+                                            setFormData({ ...formData, pricePerUnit: newPrice });
+                                        }}
+                                        className={`input ${formData.costPrice && formData.pricePerUnit && formData.pricePerUnit < formData.costPrice ? 'border-red-500 bg-red-900/20' : ''}`}
+                                        placeholder="e.g., 800"
+                                        min={formData.costPrice || 0}
+                                        required
+                                    />
+                                    <p className="text-xs text-green-500 mt-1 font-medium">
+                                        ⬇️ Price at which you SELL this product to customers (visible to shopkeepers)
+                                    </p>
+                                    {formData.costPrice && formData.pricePerUnit && formData.pricePerUnit < formData.costPrice && (
+                                        <p className="text-xs text-red-400 mt-1 font-bold">
+                                            ⚠️ Warning: Sell price is LESS than cost price! You will make a LOSS.
+                                        </p>
+                                    )}
+                                    {formData.costPrice && formData.pricePerUnit && formData.pricePerUnit > formData.costPrice && (
+                                        <p className="text-xs text-green-400 mt-1">
+                                            ✅ Profit per unit: Rs {(formData.pricePerUnit - formData.costPrice).toFixed(0)}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-2">

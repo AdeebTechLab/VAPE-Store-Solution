@@ -190,6 +190,7 @@ const sellBulk = asyncHandler(async (req, res) => {
                     qty: quantity,
                     pricePerUnit: unitPrice,
                     totalPrice: itemTotal,
+                    costPrice: product.costPrice || 0, // Store cost price at time of sale
                     soldByShopkeeperId: req.user?.id,
                     soldBy: req.user?.username || 'Unknown',
                     sessionId,

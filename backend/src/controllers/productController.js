@@ -1,6 +1,7 @@
 const { connectAdminDB, getShopConnection } = require('../config/database');
 const shopSchema = require('../models/Shop');
 const productSchema = require('../models/Product');
+const investmentSchema = require('../models/Investment');
 const asyncHandler = require('../utils/asyncHandler');
 const { generateQRCode } = require('../services/qrService');
 const { uploadToCloudinary } = require('../middleware/upload');
@@ -175,6 +176,21 @@ const createProduct = asyncHandler(async (req, res) => {
 
         await existingProduct.save();
 
+        // Log investment for restocked units
+        if (addedUnits > 0) {
+            const Investment = shopConn.model('Investment', investmentSchema);
+            const currentCost = existingProduct.costPrice || 0;
+            await new Investment({
+                type: 'restock',
+                productId: existingProduct._id,
+                productName: existingProduct.name,
+                units: addedUnits,
+                costPrice: currentCost,
+                totalAmount: addedUnits * currentCost,
+                createdBy: 'Admin',
+            }).save();
+        }
+
         // Emit real-time product update event
         try {
             emitProductUpdated(shop.dbName, existingProduct);
@@ -215,6 +231,22 @@ const createProduct = asyncHandler(async (req, res) => {
     });
 
     await product.save();
+
+    // Log investment for new product
+    const productUnits = parseInt(units) || 0;
+    const productCost = Math.round(parseFloat(costPrice) || 0);
+    if (productUnits > 0 && productCost > 0) {
+        const Investment = shopConn.model('Investment', investmentSchema);
+        await new Investment({
+            type: 'product_add',
+            productId: product._id,
+            productName: product.name,
+            units: productUnits,
+            costPrice: productCost,
+            totalAmount: productUnits * productCost,
+            createdBy: 'Admin',
+        }).save();
+    }
 
     // Emit real-time product added event
     try {

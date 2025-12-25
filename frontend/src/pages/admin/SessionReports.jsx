@@ -412,70 +412,205 @@ const SessionReports = () => {
                         )}
                     </div>
 
-                    {/* Right Column - Report Details */}
+                    {/* Right Column - Instructions when no report selected */}
                     <div className="lg:col-span-1">
                         <div className="card sticky top-4">
                             <h2 className="text-xl font-bold text-white mb-4">📋 Session Details</h2>
+                            <div className="text-center py-12 text-gray-500">
+                                <svg className="w-16 h-16 mx-auto mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                                </svg>
+                                <p>Click a session card</p>
+                                <p className="text-sm mt-1">to view full details</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                            {selectedReport ? (
-                                <div>
-                                    <div className="bg-gradient-to-r from-primary/20 to-secondary/20 rounded-lg p-4 mb-4">
-                                        <p className="font-bold text-xl text-white">{selectedReport.shopkeeperUsername}</p>
-                                        <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-                                            <div>
-                                                <p className="text-gray-400">Started</p>
-                                                <p className="text-white">{formatDate(selectedReport.startTime)}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-gray-400">Ended</p>
-                                                <p className="text-white">{formatDate(selectedReport.endTime)}</p>
-                                            </div>
-                                        </div>
-                                        <p className="text-primary font-medium mt-2">
-                                            ⏱️ Duration: {formatDuration(selectedReport.startTime, selectedReport.endTime)}
-                                        </p>
+            {/* FULL SCREEN SESSION DETAILS MODAL */}
+            {selectedReport && (
+                <div className="fixed inset-0 bg-gray-900 z-50 overflow-y-auto">
+                    <div className="min-h-screen">
+                        {/* Modal Header */}
+                        <div className="bg-gray-800 border-b border-gray-700 sticky top-0 z-10">
+                            <div className="max-w-6xl mx-auto px-4 py-4">
+                                <div className="flex items-center justify-between">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedReport(null);
+                                            setSelectedItem(null);
+                                        }}
+                                        className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-600 hover:to-gray-500 text-white rounded-xl transition-all font-semibold shadow-lg"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                        </svg>
+                                        Back to Sessions
+                                    </button>
+                                    <div className="text-right">
+                                        <p className="text-white font-bold text-lg">{selectedReport.shopkeeperUsername}</p>
+                                        <p className="text-gray-400 text-sm">{formatDate(selectedReport.endTime)}</p>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
 
-                                    <div className="grid grid-cols-2 gap-3 mb-4">
-                                        <div className="bg-green-900/30 p-4 rounded-xl text-center">
-                                            <p className="text-2xl font-bold text-green-400">Rs {selectedReport.totalAmount?.toFixed(0)}</p>
-                                            <p className="text-xs text-gray-400 mt-1">Total Sales</p>
+                        {/* Modal Content */}
+                        <div className="max-w-6xl mx-auto px-4 py-6">
+                            {/* Session Info Header */}
+                            <div className="bg-gradient-to-r from-primary/20 via-purple-900/20 to-secondary/20 rounded-2xl p-6 mb-6">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                                    <div>
+                                        <p className="text-gray-400 text-sm">Started</p>
+                                        <p className="text-white font-semibold">{formatDate(selectedReport.startTime)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-400 text-sm">Ended</p>
+                                        <p className="text-white font-semibold">{formatDate(selectedReport.endTime)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-400 text-sm">Duration</p>
+                                        <p className="text-primary font-semibold">{formatDuration(selectedReport.startTime, selectedReport.endTime)}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-400 text-sm">Items Sold</p>
+                                        <p className="text-blue-400 font-bold text-xl">{selectedReport.totalItemsSold}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Payment Method Breakdown */}
+                            {(() => {
+                                // Calculate payment method totals
+                                const paymentTotals = {
+                                    Cash: 0,
+                                    EasyPaisa: 0,
+                                    JazzCash: 0,
+                                    Card: 0,
+                                    'Bank Transfer': 0,
+                                    Other: 0
+                                };
+
+                                selectedReport.soldItems?.forEach(item => {
+                                    const method = item.paymentMethod || 'Cash';
+                                    if (paymentTotals.hasOwnProperty(method)) {
+                                        paymentTotals[method] += item.totalPrice || 0;
+                                    } else {
+                                        paymentTotals.Other += item.totalPrice || 0;
+                                    }
+                                });
+
+                                // Filter out zero amounts
+                                const activePayments = Object.entries(paymentTotals).filter(([_, amount]) => amount > 0);
+
+                                return (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                                        {/* Total Sales - Always First */}
+                                        <div className="bg-gradient-to-br from-green-900/50 to-green-700/30 border border-green-500/30 p-5 rounded-2xl">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <span className="text-2xl">💰</span>
+                                                <p className="text-gray-300 font-medium">Total Sales</p>
+                                            </div>
+                                            <p className="text-3xl font-bold text-green-400">Rs {selectedReport.totalAmount?.toFixed(0)}</p>
                                         </div>
-                                        <div className="bg-blue-900/30 p-4 rounded-xl text-center">
-                                            <p className="text-2xl font-bold text-blue-400">{selectedReport.totalItemsSold}</p>
-                                            <p className="text-xs text-gray-400 mt-1">Items Sold</p>
+
+                                        {/* Cash Payments */}
+                                        <div className="bg-gradient-to-br from-emerald-900/40 to-emerald-700/20 border border-emerald-500/20 p-5 rounded-2xl">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <span className="text-2xl">💵</span>
+                                                <p className="text-gray-300 font-medium">Cash Received</p>
+                                            </div>
+                                            <p className="text-2xl font-bold text-emerald-400">Rs {paymentTotals.Cash.toFixed(0)}</p>
+                                        </div>
+
+                                        {/* Online Payments Combined */}
+                                        <div className="bg-gradient-to-br from-purple-900/40 to-purple-700/20 border border-purple-500/20 p-5 rounded-2xl">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <span className="text-2xl">📱</span>
+                                                <p className="text-gray-300 font-medium">Online Payments</p>
+                                            </div>
+                                            <p className="text-2xl font-bold text-purple-400">
+                                                Rs {(paymentTotals.EasyPaisa + paymentTotals.JazzCash + paymentTotals.Card + paymentTotals['Bank Transfer']).toFixed(0)}
+                                            </p>
+                                            {/* Breakdown */}
+                                            <div className="mt-3 space-y-1 text-sm">
+                                                {paymentTotals.EasyPaisa > 0 && (
+                                                    <div className="flex justify-between text-purple-300">
+                                                        <span>EasyPaisa</span>
+                                                        <span>Rs {paymentTotals.EasyPaisa.toFixed(0)}</span>
+                                                    </div>
+                                                )}
+                                                {paymentTotals.JazzCash > 0 && (
+                                                    <div className="flex justify-between text-red-300">
+                                                        <span>JazzCash</span>
+                                                        <span>Rs {paymentTotals.JazzCash.toFixed(0)}</span>
+                                                    </div>
+                                                )}
+                                                {paymentTotals.Card > 0 && (
+                                                    <div className="flex justify-between text-blue-300">
+                                                        <span>Card</span>
+                                                        <span>Rs {paymentTotals.Card.toFixed(0)}</span>
+                                                    </div>
+                                                )}
+                                                {paymentTotals['Bank Transfer'] > 0 && (
+                                                    <div className="flex justify-between text-cyan-300">
+                                                        <span>Bank Transfer</span>
+                                                        <span>Rs {paymentTotals['Bank Transfer'].toFixed(0)}</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
+                                );
+                            })()}
 
-                                    <h3 className="font-semibold text-white mb-2">🛒 Sold Items</h3>
-                                    <div className="max-h-64 overflow-y-auto space-y-2">
-                                        {selectedReport.soldItems?.map((item, idx) => (
+                            {/* Sold Items Section */}
+                            <div className="bg-gray-800 rounded-2xl p-6">
+                                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                                    <span>🛒</span>
+                                    Sold Items ({selectedReport.soldItems?.length || 0})
+                                </h3>
+
+                                {selectedReport.soldItems?.length > 0 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {selectedReport.soldItems.map((item, idx) => (
                                             <div
                                                 key={idx}
-                                                className="p-3 bg-gray-700/50 rounded-lg text-sm cursor-pointer hover:bg-gray-700 transition-all"
+                                                className="bg-gray-700/50 hover:bg-gray-700 rounded-xl p-4 cursor-pointer transition-all border border-gray-600/50 hover:border-gray-500"
                                                 onClick={() => setSelectedItem(selectedItem === item ? null : item)}
                                             >
-                                                <div className="flex justify-between items-center">
+                                                <div className="flex justify-between items-start mb-2">
                                                     <div className="flex-1">
-                                                        <p className="text-white font-medium">{item.productName}</p>
-                                                        <p className="text-gray-400 text-xs">{item.qty}x @ Rs {item.pricePerUnit?.toFixed(0)}</p>
+                                                        <p className="text-white font-semibold">{item.productName}</p>
+                                                        <p className="text-gray-400 text-sm">{item.qty}x @ Rs {item.pricePerUnit?.toFixed(0)}</p>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <p className="text-green-400 font-bold">Rs {item.totalPrice?.toFixed(0)}</p>
-                                                        {item.paymentMethod && (
-                                                            <span className={`text-xs px-2 py-0.5 rounded-full ${item.paymentMethod === 'Cash' ? 'bg-green-900/50 text-green-300' : item.paymentMethod === 'EasyPaisa' ? 'bg-purple-900/50 text-purple-300' : item.paymentMethod === 'JazzCash' ? 'bg-red-900/50 text-red-300' : 'bg-blue-900/50 text-blue-300'}`}>
-                                                                {item.paymentMethod}
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                                    <p className="text-green-400 font-bold text-lg">Rs {item.totalPrice?.toFixed(0)}</p>
                                                 </div>
-                                                {/* Show customer details when clicked */}
-                                                {selectedItem === item && item.customerName && (
-                                                    <div className="mt-2 pt-2 border-t border-gray-600 text-xs space-y-1">
-                                                        <div className="flex items-center gap-2 text-gray-300">
-                                                            <span>👤</span>
-                                                            <span>{item.customerName}</span>
-                                                        </div>
+
+                                                {/* Payment Method Badge */}
+                                                <div className="flex justify-between items-center">
+                                                    <span className={`text-xs px-3 py-1 rounded-full font-medium ${item.paymentMethod === 'Cash' ? 'bg-green-900/50 text-green-300 border border-green-700' :
+                                                        item.paymentMethod === 'EasyPaisa' ? 'bg-purple-900/50 text-purple-300 border border-purple-700' :
+                                                            item.paymentMethod === 'JazzCash' ? 'bg-red-900/50 text-red-300 border border-red-700' :
+                                                                'bg-blue-900/50 text-blue-300 border border-blue-700'
+                                                        }`}>
+                                                        {item.paymentMethod || 'Cash'}
+                                                    </span>
+                                                    {item.customerName && (
+                                                        <span className="text-gray-400 text-xs">👤 {item.customerName}</span>
+                                                    )}
+                                                </div>
+
+                                                {/* Expanded Customer Details */}
+                                                {selectedItem === item && (
+                                                    <div className="mt-3 pt-3 border-t border-gray-600 space-y-2 text-sm">
+                                                        {item.customerName && (
+                                                            <div className="flex items-center gap-2 text-gray-300">
+                                                                <span>👤</span>
+                                                                <span className="font-medium">{item.customerName}</span>
+                                                            </div>
+                                                        )}
                                                         {item.customerPhone && (
                                                             <div className="flex items-center gap-2 text-gray-400">
                                                                 <span>📱</span>
@@ -488,38 +623,37 @@ const SessionReports = () => {
                                                                 <span>{item.customerEmail}</span>
                                                             </div>
                                                         )}
+                                                        {!item.customerName && !item.customerPhone && !item.customerEmail && (
+                                                            <p className="text-gray-500 italic">No customer info recorded</p>
+                                                        )}
                                                     </div>
-                                                )}
-                                                {selectedItem === item && !item.customerName && (
-                                                    <p className="mt-2 pt-2 border-t border-gray-600 text-xs text-gray-500">No customer info recorded</p>
                                                 )}
                                             </div>
                                         ))}
-                                        {(!selectedReport.soldItems || selectedReport.soldItems.length === 0) && (
-                                            <p className="text-gray-500 text-sm text-center py-4">No items sold in this session</p>
-                                        )}
                                     </div>
+                                ) : (
+                                    <div className="text-center py-8 text-gray-500">
+                                        <p>No items sold in this session</p>
+                                    </div>
+                                )}
+                            </div>
 
-                                    <button
-                                        onClick={() => handleDelete(selectedReport._id)}
-                                        className="w-full mt-4 py-3 bg-red-600/20 hover:bg-red-600 border border-red-600 text-red-400 hover:text-white rounded-xl font-medium text-sm transition-all"
-                                    >
-                                        🗑️ Delete Report
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="text-center py-12 text-gray-500">
-                                    <svg className="w-16 h-16 mx-auto mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
-                                    </svg>
-                                    <p>Click a session card</p>
-                                    <p className="text-sm mt-1">to view sold items</p>
-                                </div>
-                            )}
+                            {/* Delete Button */}
+                            <div className="mt-6 flex justify-center">
+                                <button
+                                    onClick={() => {
+                                        handleDelete(selectedReport._id);
+                                        setSelectedReport(null);
+                                    }}
+                                    className="px-8 py-3 bg-red-600/20 hover:bg-red-600 border border-red-600 text-red-400 hover:text-white rounded-xl font-medium transition-all"
+                                >
+                                    🗑️ Delete This Report
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Separate Spendings Section - Session Based Cards */}
             {(() => {

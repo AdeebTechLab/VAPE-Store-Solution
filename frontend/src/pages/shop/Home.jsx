@@ -419,15 +419,29 @@ const Home = () => {
     const processCheckout = async () => {
         try {
             const shopDbName = user?.shopDbName || 'shop_db_1';
-            const items = cart.map(item => ({
-                productId: item.productId,
-                productName: item.productName,
-                qty: item.qty,
-                price: item.price, // Include the edited price
-                type: item.type,
-                mlAmount: item.mlAmount,
-                openedBottleId: item.openedBottleId,
-            }));
+
+            // Calculate total discount to distribute
+            const subtotal = getCartTotal();
+            const totalDiscount = getDiscountAmount();
+            const discountRatio = subtotal > 0 ? totalDiscount / subtotal : 0;
+
+            // Apply proportional discount to each item
+            const items = cart.map(item => {
+                const itemTotal = item.price * item.qty;
+                const itemDiscount = itemTotal * discountRatio;
+                const discountedPrice = Math.round((item.price * item.qty - itemDiscount) / item.qty); // Per unit discounted price
+
+                return {
+                    productId: item.productId,
+                    productName: item.productName,
+                    qty: item.qty,
+                    price: discountedPrice > 0 ? discountedPrice : item.price, // Use discounted price
+                    originalPrice: item.price, // Keep original for reference
+                    type: item.type,
+                    mlAmount: item.mlAmount,
+                    openedBottleId: item.openedBottleId,
+                };
+            });
 
             const response = await api.post(`/shop/${shopDbName}/sell-bulk`, {
                 items,

@@ -23,6 +23,10 @@ const transactionSchema = new mongoose.Schema({
         type: Number,
         required: true,
     },
+    costPrice: {
+        type: Number,
+        default: 0, // Product cost price at time of sale
+    },
     soldByShopkeeperId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Shopkeeper',

@@ -48,10 +48,72 @@ const getAllShops = asyncHandler(async (req, res) => {
                     { $group: { _id: null, total: { $sum: { $multiply: ['$units', '$pricePerUnit'] } } } }
                 ]);
 
-                // Get total cost value (cost price × units) for investment calculation
+                // Get total cost value (cost price × units) for current stock
                 const costValue = await Product.aggregate([
                     { $group: { _id: null, total: { $sum: { $multiply: ['$units', '$costPrice'] } } } }
                 ]);
+                const currentStockCost = costValue[0]?.total || 0;
+
+                // ===== TOTAL INVESTMENT =====
+                // Sum of all investments ever made (costPrice × qty when products added)
+                // This ONLY INCREASES, never decreases when sold
+                let totalHistoricalInvestment = 0;
+                try {
+                    const investmentSchema = require('../models/Investment');
+                    const Investment = shopConn.model('Investment', investmentSchema);
+                    const investmentTotal = await Investment.aggregate([
+                        { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+                    ]);
+                    totalHistoricalInvestment = investmentTotal[0]?.total || 0;
+                } catch (e) {
+                    // If no investment records, fallback to current stock cost
+                    totalHistoricalInvestment = currentStockCost;
+                }
+
+                // If no investment records exist yet, use current stock as baseline
+                if (totalHistoricalInvestment === 0) {
+                    totalHistoricalInvestment = currentStockCost;
+                }
+
+                // ===== TOTAL PROFIT =====
+                // Sum of (sellPrice - costPrice) × qty for all SOLD items
+                const profitFromSales = await Transaction.aggregate([
+                    {
+                        $lookup: {
+                            from: 'products',
+                            localField: 'productId',
+                            foreignField: '_id',
+                            as: 'product'
+                        }
+                    },
+                    {
+                        $addFields: {
+                            // Use transaction costPrice if > 0, otherwise use product costPrice
+                            effectiveCostPrice: {
+                                $cond: {
+                                    if: { $gt: ['$costPrice', 0] },
+                                    then: '$costPrice',
+                                    else: { $ifNull: [{ $arrayElemAt: ['$product.costPrice', 0] }, 0] }
+                                }
+                            }
+                        }
+                    },
+                    {
+                        $group: {
+                            _id: null,
+                            // Profit = (sellPrice - costPrice) × qty
+                            totalProfit: {
+                                $sum: {
+                                    $multiply: [
+                                        { $subtract: ['$pricePerUnit', '$effectiveCostPrice'] },
+                                        '$qty'
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                ]);
+                const totalProfit = profitFromSales[0]?.totalProfit || 0;
 
                 return {
                     ...shop.toObject(),
@@ -62,13 +124,15 @@ const getAllShops = asyncHandler(async (req, res) => {
                         allTimeSales: allTimeSales[0]?.total || 0,
                         allTimeSalesCount: allTimeSales[0]?.count || 0,
                         totalStockValue: stockValue[0]?.total || 0,
-                        totalCostValue: costValue[0]?.total || 0,
+                        totalCostValue: currentStockCost,
+                        totalHistoricalInvestment: totalHistoricalInvestment,
+                        totalProfit: totalProfit,
                     },
                 };
             } catch (error) {
                 return {
                     ...shop.toObject(),
-                    stats: { productCount: 0, todaysSales: 0, todaysSalesCount: 0, allTimeSales: 0, allTimeSalesCount: 0, totalStockValue: 0, totalCostValue: 0 },
+                    stats: { productCount: 0, todaysSales: 0, todaysSalesCount: 0, allTimeSales: 0, allTimeSalesCount: 0, totalStockValue: 0, totalCostValue: 0, totalHistoricalInvestment: 0, totalProfit: 0 },
                 };
             }
         })
