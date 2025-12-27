@@ -487,7 +487,7 @@ const Dashboard = () => {
                                                 type="number"
                                                 step="1"
                                                 value={productForm.costPrice}
-                                                onChange={(e) => setProductForm({ ...productForm, costPrice: Number(e.target.value) })}
+                                                onChange={(e) => setProductForm({ ...productForm, costPrice: e.target.value })}
                                                 className="input"
                                                 placeholder="e.g., 500"
                                                 min="0"
@@ -507,23 +507,22 @@ const Dashboard = () => {
                                                 type="number"
                                                 step="1"
                                                 value={productForm.pricePerUnit}
-                                                onChange={(e) => setProductForm({ ...productForm, pricePerUnit: Number(e.target.value) })}
-                                                className={`input ${productForm.costPrice && productForm.pricePerUnit && productForm.pricePerUnit < productForm.costPrice ? 'border-red-500 bg-red-900/20' : ''}`}
+                                                onChange={(e) => setProductForm({ ...productForm, pricePerUnit: e.target.value })}
+                                                className={`input ${productForm.costPrice && Number(productForm.pricePerUnit) && Number(productForm.pricePerUnit) < Number(productForm.costPrice) ? 'border-red-500 bg-red-900/20' : ''}`}
                                                 placeholder="e.g., 800"
-                                                min={productForm.costPrice || 0}
                                                 required
                                             />
                                             <p className="text-xs text-green-500 mt-1 font-medium">
                                                 ⬇️ Price at which you SELL to customers (visible to shopkeepers)
                                             </p>
-                                            {productForm.costPrice && productForm.pricePerUnit && productForm.pricePerUnit < productForm.costPrice && (
+                                            {Number(productForm.costPrice) && Number(productForm.pricePerUnit) && Number(productForm.pricePerUnit) < Number(productForm.costPrice) && (
                                                 <p className="text-xs text-red-400 mt-1 font-bold">
                                                     ⚠️ Warning: Sell price is LESS than cost! You will make a LOSS.
                                                 </p>
                                             )}
-                                            {productForm.costPrice && productForm.pricePerUnit && productForm.pricePerUnit > productForm.costPrice && (
+                                            {Number(productForm.costPrice) && Number(productForm.pricePerUnit) && Number(productForm.pricePerUnit) > Number(productForm.costPrice) && (
                                                 <p className="text-xs text-green-400 mt-1">
-                                                    ✅ Profit per unit: Rs {(productForm.pricePerUnit - productForm.costPrice).toFixed(0)}
+                                                    ✅ Profit per unit: Rs {(Number(productForm.pricePerUnit) - Number(productForm.costPrice)).toFixed(0)}
                                                 </p>
                                             )}
                                         </div>

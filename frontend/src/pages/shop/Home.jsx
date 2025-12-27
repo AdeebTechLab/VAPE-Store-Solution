@@ -328,6 +328,7 @@ const Home = () => {
                 productName: product.name,
                 qty: 1,
                 price: product.pricePerUnit,
+                originalPrice: product.pricePerUnit, // Store original price for tracking discounts/markup
                 type: 'product',
                 maxQty: product.units,
             }]);
@@ -353,6 +354,7 @@ const Home = () => {
             qty: 1,
             mlAmount: ml,
             price: mlPrice,
+            originalPrice: mlPrice, // Store original price for tracking discounts/markup
             type: 'ml',
         }]);
 
@@ -436,7 +438,7 @@ const Home = () => {
                     productName: item.productName,
                     qty: item.qty,
                     price: discountedPrice > 0 ? discountedPrice : item.price, // Use discounted price
-                    originalPrice: item.price, // Keep original for reference
+                    originalPrice: item.originalPrice || item.price, // Send original product price (stored when added to cart)
                     type: item.type,
                     mlAmount: item.mlAmount,
                     openedBottleId: item.openedBottleId,

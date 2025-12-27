@@ -27,6 +27,10 @@ const transactionSchema = new mongoose.Schema({
         type: Number,
         default: 0, // Product cost price at time of sale
     },
+    originalPrice: {
+        type: Number,
+        default: 0, // Original price before discount/edit (0 means no discount applied)
+    },
     soldByShopkeeperId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Shopkeeper',

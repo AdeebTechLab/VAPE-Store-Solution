@@ -19,6 +19,10 @@ router.delete('/shops/:shopId', adminController.deleteShop);
 // Analytics
 router.get('/analytics', adminController.getAnalytics);
 
+// Filtered stats by date range
+router.get('/shops/stats', adminController.getAllShopsFilteredStats);
+router.get('/shops/:shopId/stats', adminController.getShopFilteredStats);
+
 // Reports
 router.get('/reports', adminController.getReports);
 router.get('/reports/:reportId/download', adminController.downloadReport);

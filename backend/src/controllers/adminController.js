@@ -56,7 +56,8 @@ const getAllShops = asyncHandler(async (req, res) => {
 
                 // ===== TOTAL INVESTMENT =====
                 // Sum of all investments ever made (costPrice × qty when products added)
-                // This ONLY INCREASES, never decreases when sold
+                // This ONLY INCREASES, never decreases when sold or deleted
+                // Investment records are permanent and never affected by product deletion
                 let totalHistoricalInvestment = 0;
                 try {
                     const investmentSchema = require('../models/Investment');
@@ -66,14 +67,14 @@ const getAllShops = asyncHandler(async (req, res) => {
                     ]);
                     totalHistoricalInvestment = investmentTotal[0]?.total || 0;
                 } catch (e) {
-                    // If no investment records, fallback to current stock cost
-                    totalHistoricalInvestment = currentStockCost;
+                    // No investment records yet - this is expected for new shops
+                    console.log('No investment records found for shop:', shop.name);
                 }
 
-                // If no investment records exist yet, use current stock as baseline
-                if (totalHistoricalInvestment === 0) {
-                    totalHistoricalInvestment = currentStockCost;
-                }
+                // Note: We no longer fallback to currentStockCost because:
+                // 1. It would cause investment to decrease when products are deleted
+                // 2. Investment should only reflect actual product additions
+                // If totalHistoricalInvestment is 0, it means no products have been added yet
 
                 // ===== TOTAL PROFIT =====
                 // Sum of (sellPrice - costPrice) × qty for all SOLD items
@@ -856,6 +857,231 @@ const deleteShop = asyncHandler(async (req, res) => {
     }
 });
 
+/**
+ * Get filtered stats for all shops combined
+ * GET /api/admin/shops/stats?fromDate=&toDate=
+ */
+const getAllShopsFilteredStats = asyncHandler(async (req, res) => {
+    const { fromDate, toDate } = req.query;
+
+    const adminConn = await connectAdminDB();
+    const Shop = adminConn.model('Shop', shopSchema);
+    const shops = await Shop.find({ isActive: true });
+
+    let totalSales = 0;
+    let totalProfit = 0;
+    let totalInvestment = 0;
+    let transactionCount = 0;
+
+    // Build date filter
+    const dateFilter = {};
+    if (fromDate) {
+        dateFilter.$gte = new Date(fromDate);
+    }
+    if (toDate) {
+        const endDate = new Date(toDate);
+        endDate.setHours(23, 59, 59, 999);
+        dateFilter.$lte = endDate;
+    }
+
+    for (const shop of shops) {
+        try {
+            const shopConn = await getShopConnection(shop.dbName);
+            const Transaction = shopConn.model('Transaction', transactionSchema);
+
+            // Build query with date filter
+            const matchQuery = Object.keys(dateFilter).length > 0
+                ? { soldAt: dateFilter }
+                : {};
+
+            // Get sales in date range
+            const salesAgg = await Transaction.aggregate([
+                { $match: matchQuery },
+                {
+                    $group: {
+                        _id: null,
+                        totalSales: { $sum: '$totalPrice' },
+                        count: { $sum: 1 }
+                    }
+                }
+            ]);
+
+            totalSales += salesAgg[0]?.totalSales || 0;
+            transactionCount += salesAgg[0]?.count || 0;
+
+            // Get profit in date range
+            const profitAgg = await Transaction.aggregate([
+                { $match: matchQuery },
+                {
+                    $lookup: {
+                        from: 'products',
+                        localField: 'productId',
+                        foreignField: '_id',
+                        as: 'product'
+                    }
+                },
+                {
+                    $addFields: {
+                        effectiveCostPrice: {
+                            $cond: {
+                                if: { $gt: ['$costPrice', 0] },
+                                then: '$costPrice',
+                                else: { $ifNull: [{ $arrayElemAt: ['$product.costPrice', 0] }, 0] }
+                            }
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalProfit: {
+                            $sum: { $multiply: [{ $subtract: ['$pricePerUnit', '$effectiveCostPrice'] }, '$qty'] }
+                        }
+                    }
+                }
+            ]);
+
+            totalProfit += profitAgg[0]?.totalProfit || 0;
+
+            // Get investment in date range
+            try {
+                const investmentSchema = require('../models/Investment');
+                const Investment = shopConn.model('Investment', investmentSchema);
+                const investmentMatchQuery = Object.keys(dateFilter).length > 0
+                    ? { createdAt: dateFilter }
+                    : {};
+                const investmentAgg = await Investment.aggregate([
+                    { $match: investmentMatchQuery },
+                    { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+                ]);
+                totalInvestment += investmentAgg[0]?.total || 0;
+            } catch (e) {
+                // No investment records
+            }
+        } catch (error) {
+            console.error(`Error getting stats for shop ${shop.name}:`, error);
+        }
+    }
+
+    res.json({
+        success: true,
+        stats: {
+            totalSales,
+            totalProfit,
+            totalInvestment,
+            transactionCount,
+            dateRange: { fromDate, toDate }
+        }
+    });
+});
+
+/**
+ * Get filtered stats for a specific shop
+ * GET /api/admin/shops/:shopId/stats?fromDate=&toDate=
+ */
+const getShopFilteredStats = asyncHandler(async (req, res) => {
+    const { shopId } = req.params;
+    const { fromDate, toDate } = req.query;
+
+    const adminConn = await connectAdminDB();
+    const Shop = adminConn.model('Shop', shopSchema);
+    const shop = await Shop.findById(shopId);
+
+    if (!shop) {
+        return res.status(404).json({ success: false, message: 'Shop not found' });
+    }
+
+    const shopConn = await getShopConnection(shop.dbName);
+    const Transaction = shopConn.model('Transaction', transactionSchema);
+
+    // Build date filter
+    const dateFilter = {};
+    if (fromDate) {
+        dateFilter.$gte = new Date(fromDate);
+    }
+    if (toDate) {
+        const endDate = new Date(toDate);
+        endDate.setHours(23, 59, 59, 999);
+        dateFilter.$lte = endDate;
+    }
+
+    const matchQuery = Object.keys(dateFilter).length > 0
+        ? { soldAt: dateFilter }
+        : {};
+
+    // Get sales in date range
+    const salesAgg = await Transaction.aggregate([
+        { $match: matchQuery },
+        {
+            $group: {
+                _id: null,
+                totalSales: { $sum: '$totalPrice' },
+                count: { $sum: 1 }
+            }
+        }
+    ]);
+
+    // Get profit in date range
+    const profitAgg = await Transaction.aggregate([
+        { $match: matchQuery },
+        {
+            $lookup: {
+                from: 'products',
+                localField: 'productId',
+                foreignField: '_id',
+                as: 'product'
+            }
+        },
+        {
+            $addFields: {
+                effectiveCostPrice: {
+                    $cond: {
+                        if: { $gt: ['$costPrice', 0] },
+                        then: '$costPrice',
+                        else: { $ifNull: [{ $arrayElemAt: ['$product.costPrice', 0] }, 0] }
+                    }
+                }
+            }
+        },
+        {
+            $group: {
+                _id: null,
+                totalProfit: {
+                    $sum: { $multiply: [{ $subtract: ['$pricePerUnit', '$effectiveCostPrice'] }, '$qty'] }
+                }
+            }
+        }
+    ]);
+
+    // Get investment in date range
+    let totalInvestment = 0;
+    try {
+        const investmentSchema = require('../models/Investment');
+        const Investment = shopConn.model('Investment', investmentSchema);
+        const investmentMatchQuery = Object.keys(dateFilter).length > 0
+            ? { createdAt: dateFilter }
+            : {};
+        const investmentAgg = await Investment.aggregate([
+            { $match: investmentMatchQuery },
+            { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+        ]);
+        totalInvestment = investmentAgg[0]?.total || 0;
+    } catch (e) {
+        // No investment records
+    }
+
+    res.json({
+        success: true,
+        stats: {
+            totalSales: salesAgg[0]?.totalSales || 0,
+            totalProfit: profitAgg[0]?.totalProfit || 0,
+            totalInvestment,
+            transactionCount: salesAgg[0]?.count || 0,
+            dateRange: { fromDate, toDate }
+        }
+    });
+});
+
 module.exports = {
     getAllShops,
     createShop,
@@ -870,4 +1096,6 @@ module.exports = {
     getSessionReportDetails,
     deleteSessionReport,
     updateSessionReconciliation,
+    getAllShopsFilteredStats,
+    getShopFilteredStats,
 };

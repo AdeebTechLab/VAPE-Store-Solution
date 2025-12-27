@@ -583,10 +583,44 @@ const SessionReports = () => {
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div className="flex-1">
                                                         <p className="text-white font-semibold">{item.productName}</p>
-                                                        <p className="text-gray-400 text-sm">{item.qty}x @ Rs {item.pricePerUnit?.toFixed(0)}</p>
+                                                        <div className="text-sm">
+                                                            {/* Show price change if original price differs from sell price */}
+                                                            {item.originalPrice && item.originalPrice !== item.pricePerUnit ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-gray-500 line-through">Rs {item.originalPrice?.toFixed(0)}</span>
+                                                                    <span className={item.pricePerUnit > item.originalPrice ? 'text-blue-400' : 'text-green-400'}>
+                                                                        → Rs {item.pricePerUnit?.toFixed(0)}
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-gray-400">{item.qty}x @ Rs {item.pricePerUnit?.toFixed(0)}</span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <p className="text-green-400 font-bold text-lg">Rs {item.totalPrice?.toFixed(0)}</p>
                                                 </div>
+
+                                                {/* Price Change Badge - discount or markup */}
+                                                {item.originalPrice && item.originalPrice > item.pricePerUnit && (
+                                                    <div className="mb-2 flex items-center gap-2 flex-wrap">
+                                                        <span className="text-xs px-2 py-1 rounded-full bg-orange-900/50 text-orange-300 border border-orange-700">
+                                                            🏷️ Discount: Rs {((item.originalPrice - item.pricePerUnit) * item.qty).toFixed(0)} off
+                                                        </span>
+                                                        <span className="text-xs text-orange-400">
+                                                            ({(((item.originalPrice - item.pricePerUnit) / item.originalPrice) * 100).toFixed(0)}% discount)
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {item.originalPrice && item.pricePerUnit > item.originalPrice && (
+                                                    <div className="mb-2 flex items-center gap-2 flex-wrap">
+                                                        <span className="text-xs px-2 py-1 rounded-full bg-blue-900/50 text-blue-300 border border-blue-700">
+                                                            📈 Price Increased: +Rs {((item.pricePerUnit - item.originalPrice) * item.qty).toFixed(0)}
+                                                        </span>
+                                                        <span className="text-xs text-blue-400">
+                                                            (+{(((item.pricePerUnit - item.originalPrice) / item.originalPrice) * 100).toFixed(0)}% markup)
+                                                        </span>
+                                                    </div>
+                                                )}
 
                                                 {/* Payment Method Badge */}
                                                 <div className="flex justify-between items-center">

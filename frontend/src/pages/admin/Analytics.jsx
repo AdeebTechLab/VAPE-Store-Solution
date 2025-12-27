@@ -44,6 +44,12 @@ const Analytics = () => {
     const [openedBottles, setOpenedBottles] = useState([]);
     const [loadingProducts, setLoadingProducts] = useState(false);
 
+    // Date filter state
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+    const [filteredStats, setFilteredStats] = useState(null);
+    const [loadingFilteredStats, setLoadingFilteredStats] = useState(false);
+
     useEffect(() => {
         fetchAnalyticsData();
     }, []);
@@ -96,6 +102,46 @@ const Analytics = () => {
         }
     };
 
+    // Fetch stats filtered by date range
+    const fetchFilteredStats = async () => {
+        if (!dateFrom && !dateTo) {
+            setFilteredStats(null);
+            return;
+        }
+
+        setLoadingFilteredStats(true);
+        try {
+            const params = new URLSearchParams();
+            if (dateFrom) params.append('fromDate', dateFrom);
+            if (dateTo) params.append('toDate', dateTo);
+
+            if (selectedShop) {
+                // Fetch for specific shop
+                const response = await api.get(`/admin/shops/${selectedShop._id}/stats?${params.toString()}`);
+                if (response.data.success) {
+                    setFilteredStats(response.data.stats);
+                }
+            } else {
+                // Fetch for all shops
+                const response = await api.get(`/admin/shops/stats?${params.toString()}`);
+                if (response.data.success) {
+                    setFilteredStats(response.data.stats);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching filtered stats:', error);
+            setFilteredStats(null);
+        }
+        setLoadingFilteredStats(false);
+    };
+
+    // Clear date filter
+    const clearDateFilter = () => {
+        setDateFrom('');
+        setDateTo('');
+        setFilteredStats(null);
+    };
+
     // Timeline options
     const timelineOptions = [
         { value: '1w', label: '1 Week' },
@@ -141,6 +187,45 @@ const Analytics = () => {
 
     // Get data for selected shop or all shops
     const getAnalyticsData = () => {
+        // If filtered stats are available, use them for sales and profit
+        if (filteredStats) {
+            // When date filter is active, show filtered sales/profit
+            // but keep investment and stock as they are (not date-dependent)
+            if (selectedShop) {
+                const openedBottlesValue = openedBottles.reduce((sum, bottle) => {
+                    const pricePerMl = bottle.pricePerMl || 0;
+                    const remainingMl = bottle.remainingMl || 0;
+                    return sum + (pricePerMl * remainingMl);
+                }, 0);
+
+                return {
+                    totalSales: filteredStats.totalSales || 0,
+                    todaysSales: 0, // Not applicable with date filter
+                    productCount: selectedShop.stats?.productCount || 0,
+                    stockValue: (selectedShop.stats?.totalStockValue || 0) + openedBottlesValue,
+                    openedBottlesValue: openedBottlesValue,
+                    openedBottlesCount: openedBottles.length,
+                    totalInvestment: filteredStats.totalInvestment || 0,
+                    totalProfit: filteredStats.totalProfit || 0,
+                    transactionCount: filteredStats.transactionCount || 0,
+                    isFiltered: true,
+                };
+            } else {
+                return {
+                    totalSales: filteredStats.totalSales || 0,
+                    todaysSales: 0,
+                    productCount: shops.reduce((sum, s) => sum + (s.stats?.productCount || 0), 0),
+                    stockValue: shops.reduce((sum, s) => sum + (s.stats?.totalStockValue || 0), 0),
+                    openedBottlesValue: 0,
+                    openedBottlesCount: 0,
+                    totalInvestment: filteredStats.totalInvestment || 0,
+                    totalProfit: filteredStats.totalProfit || 0,
+                    transactionCount: filteredStats.transactionCount || 0,
+                    isFiltered: true,
+                };
+            }
+        }
+
         if (selectedShop) {
             // Calculate opened bottles value (remaining ML * price per ML)
             const openedBottlesValue = openedBottles.reduce((sum, bottle) => {
@@ -307,6 +392,56 @@ const Analytics = () => {
                     </div>
                 </div>
 
+                {/* Date Range Filter */}
+                <div className="mb-6 bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                    <h2 className="text-lg font-semibold text-white mb-3">📅 Date Range Filter</h2>
+                    <div className="flex flex-wrap items-end gap-4">
+                        <div>
+                            <label className="block text-sm text-gray-400 mb-1">From Date</label>
+                            <input
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="input bg-gray-700 border-gray-600 text-white px-3 py-2 rounded-lg"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm text-gray-400 mb-1">To Date</label>
+                            <input
+                                type="date"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="input bg-gray-700 border-gray-600 text-white px-3 py-2 rounded-lg"
+                            />
+                        </div>
+                        <button
+                            onClick={fetchFilteredStats}
+                            disabled={!dateFrom && !dateTo}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${dateFrom || dateTo
+                                ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                }`}
+                        >
+                            {loadingFilteredStats ? '⏳ Loading...' : '🔍 Apply Filter'}
+                        </button>
+                        {(dateFrom || dateTo || filteredStats) && (
+                            <button
+                                onClick={clearDateFilter}
+                                className="px-4 py-2 rounded-lg font-medium bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-all"
+                            >
+                                ✕ Clear
+                            </button>
+                        )}
+                    </div>
+                    {filteredStats && (
+                        <div className="mt-3 px-3 py-2 bg-blue-900/30 border border-blue-700/50 rounded-lg">
+                            <p className="text-sm text-blue-300">
+                                📊 Showing data from {dateFrom || 'start'} to {dateTo || 'now'}
+                            </p>
+                        </div>
+                    )}
+                </div>
+
                 {/* Timeline Selector (shown when shop selected) */}
                 {selectedShop && (
                     <div className="mb-6">
@@ -337,11 +472,16 @@ const Analytics = () => {
                     <div className="card bg-gradient-to-br from-red-900/50 to-red-600/30 border border-red-500/30 p-6">
                         <div className="flex items-center gap-3 mb-2">
                             <span className="text-3xl">💰</span>
-                            <p className="text-gray-400">Total Investment</p>
+                            <p className="text-gray-400">
+                                {analyticsData.isFiltered ? 'Investment in Range' : 'Total Investment'}
+                            </p>
                         </div>
                         <p className="text-3xl font-bold text-red-400">Rs {formatCurrency(analyticsData.totalInvestment)}</p>
                         <p className="text-sm text-gray-500 mt-2">
-                            {selectedShop ? `${selectedShop.name}` : `All ${shops.length} Shops`}
+                            {analyticsData.isFiltered
+                                ? 'Filtered by date range'
+                                : (selectedShop ? `${selectedShop.name}` : `All ${shops.length} Shops`)
+                            }
                         </p>
                     </div>
 
@@ -349,11 +489,16 @@ const Analytics = () => {
                     <div className="card bg-gradient-to-br from-blue-900/50 to-blue-600/30 border border-blue-500/30 p-6">
                         <div className="flex items-center gap-3 mb-2">
                             <span className="text-3xl">📈</span>
-                            <p className="text-gray-400">Total Sales</p>
+                            <p className="text-gray-400">
+                                {analyticsData.isFiltered ? 'Sales in Range' : 'Total Sales'}
+                            </p>
                         </div>
                         <p className="text-3xl font-bold text-blue-400">Rs {formatCurrency(analyticsData.totalSales)}</p>
                         <p className="text-sm text-gray-500 mt-2">
-                            Today: Rs {formatCurrency(analyticsData.todaysSales)}
+                            {analyticsData.isFiltered
+                                ? `${analyticsData.transactionCount || 0} transactions found`
+                                : `Today: Rs ${formatCurrency(analyticsData.todaysSales)}`
+                            }
                         </p>
                     </div>
 
@@ -361,13 +506,18 @@ const Analytics = () => {
                     <div className="card bg-gradient-to-br from-green-900/50 to-green-600/30 border border-green-500/30 p-6">
                         <div className="flex items-center gap-3 mb-2">
                             <span className="text-3xl">🎯</span>
-                            <p className="text-gray-400">Total Profit</p>
+                            <p className="text-gray-400">
+                                {analyticsData.isFiltered ? 'Profit in Range' : 'Total Profit'}
+                            </p>
                         </div>
                         <p className={`text-3xl font-bold ${analyticsData.totalProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             Rs {formatCurrency(analyticsData.totalProfit)}
                         </p>
                         <p className="text-sm text-gray-500 mt-2">
-                            (Sell Price - Cost Price) × Qty
+                            {analyticsData.isFiltered
+                                ? `Filtered by date range`
+                                : `(Sell Price - Cost Price) × Qty`
+                            }
                         </p>
                     </div>
                 </div>

@@ -30,6 +30,7 @@ const sessionReportSchema = new mongoose.Schema({
         qty: Number,
         pricePerUnit: Number,
         totalPrice: Number,
+        originalPrice: Number, // Original price before discount/edit
         customerName: String,
         customerPhone: String,
         customerEmail: String,

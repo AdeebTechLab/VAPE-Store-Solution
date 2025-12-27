@@ -541,7 +541,7 @@ const ProductManagement = () => {
                                         type="number"
                                         step="1"
                                         value={formData.costPrice}
-                                        onChange={(e) => setFormData({ ...formData, costPrice: Number(e.target.value) })}
+                                        onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
                                         className="input"
                                         placeholder="e.g., 500"
                                         min="0"
@@ -561,30 +561,22 @@ const ProductManagement = () => {
                                         type="number"
                                         step="1"
                                         value={formData.pricePerUnit}
-                                        onChange={(e) => {
-                                            const newPrice = Number(e.target.value);
-                                            // Validate: sell price should be >= cost price
-                                            if (formData.costPrice && newPrice < formData.costPrice) {
-                                                // Show warning but allow input
-                                            }
-                                            setFormData({ ...formData, pricePerUnit: newPrice });
-                                        }}
-                                        className={`input ${formData.costPrice && formData.pricePerUnit && formData.pricePerUnit < formData.costPrice ? 'border-red-500 bg-red-900/20' : ''}`}
+                                        onChange={(e) => setFormData({ ...formData, pricePerUnit: e.target.value })}
+                                        className={`input ${formData.costPrice && Number(formData.pricePerUnit) && Number(formData.pricePerUnit) < Number(formData.costPrice) ? 'border-red-500 bg-red-900/20' : ''}`}
                                         placeholder="e.g., 800"
-                                        min={formData.costPrice || 0}
                                         required
                                     />
                                     <p className="text-xs text-green-500 mt-1 font-medium">
                                         ⬇️ Price at which you SELL this product to customers (visible to shopkeepers)
                                     </p>
-                                    {formData.costPrice && formData.pricePerUnit && formData.pricePerUnit < formData.costPrice && (
+                                    {Number(formData.costPrice) && Number(formData.pricePerUnit) && Number(formData.pricePerUnit) < Number(formData.costPrice) && (
                                         <p className="text-xs text-red-400 mt-1 font-bold">
                                             ⚠️ Warning: Sell price is LESS than cost price! You will make a LOSS.
                                         </p>
                                     )}
-                                    {formData.costPrice && formData.pricePerUnit && formData.pricePerUnit > formData.costPrice && (
+                                    {Number(formData.costPrice) && Number(formData.pricePerUnit) && Number(formData.pricePerUnit) > Number(formData.costPrice) && (
                                         <p className="text-xs text-green-400 mt-1">
-                                            ✅ Profit per unit: Rs {(formData.pricePerUnit - formData.costPrice).toFixed(0)}
+                                            ✅ Profit per unit: Rs {(Number(formData.pricePerUnit) - Number(formData.costPrice)).toFixed(0)}
                                         </p>
                                     )}
                                 </div>

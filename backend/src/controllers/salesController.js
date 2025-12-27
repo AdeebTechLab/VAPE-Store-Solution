@@ -147,6 +147,7 @@ const sellBulk = asyncHandler(async (req, res) => {
                     qty: 1,
                     pricePerUnit: mlPrice,
                     totalPrice: mlPrice,
+                    originalPrice: item.originalPrice || calculatedMlPrice, // Original ML price before edit
                     soldByShopkeeperId: req.user?.id,
                     soldBy: req.user?.username || 'Unknown',
                     sessionId,
@@ -161,6 +162,7 @@ const sellBulk = asyncHandler(async (req, res) => {
                     name: `${openedBottle.productName} (${item.mlAmount}ml)`,
                     qty: 1,
                     price: mlPrice,
+                    originalPrice: item.originalPrice || calculatedMlPrice, // Original ML price before edit
                 });
                 totalAmount += mlPrice;
                 sessionService.updateSession(sessionId, mlPrice);
@@ -191,6 +193,7 @@ const sellBulk = asyncHandler(async (req, res) => {
                     pricePerUnit: unitPrice,
                     totalPrice: itemTotal,
                     costPrice: product.costPrice || 0, // Store cost price at time of sale
+                    originalPrice: item.originalPrice || product.pricePerUnit, // Original price before discount
                     soldByShopkeeperId: req.user?.id,
                     soldBy: req.user?.username || 'Unknown',
                     sessionId,
@@ -205,6 +208,7 @@ const sellBulk = asyncHandler(async (req, res) => {
                     name: product.name,
                     qty: quantity,
                     price: unitPrice,
+                    originalPrice: item.originalPrice || product.pricePerUnit, // Original price before discount
                 });
                 totalAmount += itemTotal;
                 sessionService.updateSession(sessionId, itemTotal);
@@ -275,6 +279,7 @@ const logoutAndGenerateReport = asyncHandler(async (req, res) => {
         qty: t.qty,
         pricePerUnit: t.pricePerUnit,
         totalPrice: t.totalPrice,
+        originalPrice: t.originalPrice || t.pricePerUnit, // Original price before discount
         customerName: t.customerName || '',
         customerPhone: t.customerPhone || '',
         customerEmail: t.customerEmail || '',
