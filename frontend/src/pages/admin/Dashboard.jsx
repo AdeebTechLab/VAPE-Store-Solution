@@ -30,6 +30,14 @@ const Dashboard = () => {
     const [imageFile, setImageFile] = useState(null);
     const [submitting, setSubmitting] = useState(false);
 
+    // Low stock notifications state
+    const [lowStockProducts, setLowStockProducts] = useState({}); // { shopId: [products] }
+    const [dismissedNotifications, setDismissedNotifications] = useState(() => {
+        // Load dismissed notifications from localStorage
+        const saved = localStorage.getItem('dismissedLowStockNotifications');
+        return saved ? JSON.parse(saved) : {};
+    });
+
     // Barcode scanning state
     const [isScanning, setIsScanning] = useState(false);
     const scanBufferRef = useRef('');
@@ -114,6 +122,24 @@ const Dashboard = () => {
 
             if (shopsRes.data.success) {
                 setShops(shopsRes.data.shops);
+
+                // Fetch low stock products for each shop
+                const lowStockData = {};
+                for (const shop of shopsRes.data.shops) {
+                    try {
+                        const productsRes = await api.get(`/admin/shops/${shop._id}/products`);
+                        if (productsRes.data.success) {
+                            // Filter products with low stock (units <= 3)
+                            const lowStock = productsRes.data.products.filter(p => p.units <= 3);
+                            if (lowStock.length > 0) {
+                                lowStockData[shop._id] = lowStock;
+                            }
+                        }
+                    } catch (e) {
+                        console.error(`Error fetching products for shop ${shop.name}:`, e);
+                    }
+                }
+                setLowStockProducts(lowStockData);
             }
 
             if (analyticsRes.data.success) {
@@ -130,6 +156,22 @@ const Dashboard = () => {
     const handleLogout = () => {
         logout();
         navigate('/login');
+    };
+
+    // Dismiss a low stock notification
+    const dismissNotification = (shopId, productId) => {
+        const newDismissed = {
+            ...dismissedNotifications,
+            [`${shopId}-${productId}`]: true
+        };
+        setDismissedNotifications(newDismissed);
+        localStorage.setItem('dismissedLowStockNotifications', JSON.stringify(newDismissed));
+    };
+
+    // Get non-dismissed low stock products for a shop
+    const getActiveNotifications = (shopId) => {
+        const products = lowStockProducts[shopId] || [];
+        return products.filter(p => !dismissedNotifications[`${shopId}-${p._id}`]);
     };
 
     const handleOpenAddProduct = () => {
@@ -270,49 +312,97 @@ const Dashboard = () => {
                 <div className="card">
                     <h3 className="text-xl font-bold text-white mb-4">Your Shops</h3>
                     <div className="space-y-4">
-                        {shops.map((shop) => (
-                            <div
-                                key={shop._id}
-                                className="p-4 bg-gray-700 rounded-lg border border-gray-600 hover:border-primary transition-all"
-                            >
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <h4 className="text-lg font-semibold text-white">{shop.name}</h4>
-                                        <p className="text-sm text-gray-400">{shop.location || 'No location set'}</p>
-                                        <div className="flex gap-4 mt-2">
-                                            <span className="text-sm text-gray-300">
-                                                Products: <span className="font-semibold">{shop.stats?.productCount || 0}</span>
-                                            </span>
-                                            <span className="text-sm text-gray-300">
-                                                Today's Sales: <span className="font-semibold text-green-400">
-                                                    Rs {(shop.stats?.todaysSales || 0).toFixed(2)}
+                        {shops.map((shop) => {
+                            const hasLowStock = getActiveNotifications(shop._id).length > 0;
+                            return (
+                                <div
+                                    key={shop._id}
+                                    className={`p-4 bg-gray-700 rounded-lg border-2 transition-all ${hasLowStock
+                                        ? 'border-red-500 shadow-lg shadow-red-500/20'
+                                        : 'border-gray-600 hover:border-primary'
+                                        }`}
+                                >
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-white">{shop.name}</h4>
+                                            <p className="text-sm text-gray-400">{shop.location || 'No location set'}</p>
+                                            <div className="flex gap-4 mt-2">
+                                                <span className="text-sm text-gray-300">
+                                                    Products: <span className="font-semibold">{shop.stats?.productCount || 0}</span>
                                                 </span>
-                                            </span>
+                                                <span className="text-sm text-gray-300">
+                                                    Today's Sales: <span className="font-semibold text-green-400">
+                                                        Rs {(shop.stats?.todaysSales || 0).toFixed(2)}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Link
+                                                to={`/admin/shop/${shop._id}/products`}
+                                                className="btn-primary text-sm"
+                                            >
+                                                Manage Products
+                                            </Link>
+                                            <Link
+                                                to={`/admin/shop/${shop._id}/shopkeepers`}
+                                                className="btn-secondary text-sm"
+                                            >
+                                                Shopkeepers
+                                            </Link>
+                                            <Link
+                                                to={`/admin/shop/${shop._id}/session-reports`}
+                                                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-all"
+                                            >
+                                                Shopkeeper Report
+                                            </Link>
                                         </div>
                                     </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        <Link
-                                            to={`/admin/shop/${shop._id}/products`}
-                                            className="btn-primary text-sm"
-                                        >
-                                            Manage Products
-                                        </Link>
-                                        <Link
-                                            to={`/admin/shop/${shop._id}/shopkeepers`}
-                                            className="btn-secondary text-sm"
-                                        >
-                                            Shopkeepers
-                                        </Link>
-                                        <Link
-                                            to={`/admin/shop/${shop._id}/session-reports`}
-                                            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-all"
-                                        >
-                                            Shopkeeper Report
-                                        </Link>
-                                    </div>
+
+                                    {/* Low Stock Notifications */}
+                                    {getActiveNotifications(shop._id).length > 0 && (
+                                        <div className="mt-3 p-3 bg-red-900/20 border border-red-500 rounded-lg">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-red-400 text-lg">⚠️</span>
+                                                <span className="text-red-400 font-semibold text-sm">Low Stock Alert</span>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {getActiveNotifications(shop._id).map(product => (
+                                                    <div
+                                                        key={product._id}
+                                                        className="flex items-center justify-between bg-red-900/30 px-3 py-2 rounded border border-red-600/50"
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${product.units === 0
+                                                                ? 'bg-red-600 text-white'
+                                                                : product.units === 1
+                                                                    ? 'bg-orange-600 text-white'
+                                                                    : 'bg-yellow-600 text-white'
+                                                                }`}>
+                                                                {product.units} left
+                                                            </span>
+                                                            <span className="text-white text-sm">{product.name}</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                dismissNotification(shop._id, product._id);
+                                                            }}
+                                                            className="text-gray-400 hover:text-white p-1"
+                                                            title="Dismiss notification"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 

@@ -718,7 +718,13 @@ const ProductManagement = () => {
                                 </thead>
                                 <tbody className="divide-y divide-gray-700">
                                     {(hideEmptyProducts ? products.filter(p => p.units > 0) : products).map((product) => (
-                                        <tr key={product._id} className="hover:bg-gray-700/50">
+                                        <tr
+                                            key={product._id}
+                                            className={`hover:bg-gray-700/50 ${product.units <= 3
+                                                    ? 'bg-red-900/30 border-l-4 border-red-500'
+                                                    : ''
+                                                }`}
+                                        >
                                             <td className="px-4 py-3">
                                                 {product.imageUrl ? (
                                                     <img

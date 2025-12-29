@@ -833,7 +833,10 @@ const Home = () => {
                         {filteredProducts.map((product) => (
                             <div
                                 key={product._id}
-                                className="bg-gray-800 rounded-lg p-2 border border-gray-700 hover:border-primary transition-all"
+                                className={`bg-gray-800 rounded-lg p-2 border-2 transition-all ${product.units <= 3
+                                        ? 'border-red-500 shadow-lg shadow-red-500/30'
+                                        : 'border-gray-700 hover:border-primary'
+                                    }`}
                             >
                                 {/* Product Image - Smaller */}
                                 <div className="h-24 bg-gray-700 rounded-lg mb-2 flex items-center justify-center overflow-hidden">
