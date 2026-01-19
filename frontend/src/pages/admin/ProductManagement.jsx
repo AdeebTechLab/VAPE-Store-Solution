@@ -13,6 +13,10 @@ const ProductManagement = () => {
     const [shopName, setShopName] = useState('Shop');
     const [hideEmptyProducts, setHideEmptyProducts] = useState(false);
 
+    // Search and filter state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortOption, setSortOption] = useState('default'); // default, name-asc, name-desc, price-asc, price-desc, stock-asc, stock-desc, brand-asc
+
     // Edit product modal state
     const [editingProduct, setEditingProduct] = useState(null);
     const [editFormData, setEditFormData] = useState({
@@ -497,6 +501,61 @@ const ProductManagement = () => {
         }
     };
 
+    // Filter and sort products based on search query and sort option
+    const getFilteredAndSortedProducts = () => {
+        let filtered = [...products];
+
+        // Apply hide empty filter first
+        if (hideEmptyProducts) {
+            filtered = filtered.filter(p => p.units > 0);
+        }
+
+        // Apply search filter
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase().trim();
+            filtered = filtered.filter(p =>
+                p.name?.toLowerCase().includes(query) ||
+                p.brand?.toLowerCase().includes(query) ||
+                p.category?.toLowerCase().includes(query) ||
+                p.barcode?.toLowerCase().includes(query) ||
+                p.flavour?.toLowerCase().includes(query)
+            );
+        }
+
+        // Apply sorting
+        switch (sortOption) {
+            case 'name-asc':
+                filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                break;
+            case 'name-desc':
+                filtered.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+                break;
+            case 'brand-asc':
+                filtered.sort((a, b) => (a.brand || '').localeCompare(b.brand || ''));
+                break;
+            case 'brand-desc':
+                filtered.sort((a, b) => (b.brand || '').localeCompare(a.brand || ''));
+                break;
+            case 'price-asc':
+                filtered.sort((a, b) => (a.pricePerUnit || 0) - (b.pricePerUnit || 0));
+                break;
+            case 'price-desc':
+                filtered.sort((a, b) => (b.pricePerUnit || 0) - (a.pricePerUnit || 0));
+                break;
+            case 'stock-asc':
+                filtered.sort((a, b) => (a.units || 0) - (b.units || 0));
+                break;
+            case 'stock-desc':
+                filtered.sort((a, b) => (b.units || 0) - (a.units || 0));
+                break;
+            default:
+                // Keep original order
+                break;
+        }
+
+        return filtered;
+    };
+
     if (loading) {
         return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">Loading...</div>;
     }
@@ -747,8 +806,12 @@ const ProductManagement = () => {
 
                 {/* Products List */}
                 <div className="card">
+                    {/* Header with count and Hide Empty toggle */}
                     <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-bold text-white">Products ({(hideEmptyProducts ? products.filter(p => p.units > 0) : products).length})</h2>
+                        <h2 className="text-xl font-bold text-white">
+                            Products ({getFilteredAndSortedProducts().length}
+                            {searchQuery && ` of ${products.length}`})
+                        </h2>
                         <label className="flex items-center gap-2 cursor-pointer">
                             <span className="text-sm text-gray-400">Hide Empty</span>
                             <div className="relative">
@@ -764,6 +827,50 @@ const ProductManagement = () => {
                         </label>
                     </div>
 
+                    {/* Search and Sort Controls */}
+                    <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                        {/* Search Input */}
+                        <div className="flex-1 relative">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search by name, brand, category, barcode..."
+                                className="input w-full pl-10"
+                            />
+                            <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Sort Dropdown */}
+                        <select
+                            value={sortOption}
+                            onChange={(e) => setSortOption(e.target.value)}
+                            className="input w-full sm:w-48"
+                        >
+                            <option value="default">Default Order</option>
+                            <option value="name-asc">Name (A → Z)</option>
+                            <option value="name-desc">Name (Z → A)</option>
+                            <option value="brand-asc">Brand (A → Z)</option>
+                            <option value="brand-desc">Brand (Z → A)</option>
+                            <option value="price-asc">Price (Low → High)</option>
+                            <option value="price-desc">Price (High → Low)</option>
+                            <option value="stock-asc">Stock (Low → High)</option>
+                            <option value="stock-desc">Stock (High → Low)</option>
+                        </select>
+                    </div>
+
                     {products.length === 0 ? (
                         <div className="text-center py-12">
                             <svg className="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -771,6 +878,14 @@ const ProductManagement = () => {
                             </svg>
                             <p className="text-gray-400 text-lg mb-2">No products yet</p>
                             <p className="text-gray-500 text-sm">Click "Add Product" to create your first product</p>
+                        </div>
+                    ) : getFilteredAndSortedProducts().length === 0 ? (
+                        <div className="text-center py-12">
+                            <svg className="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <p className="text-gray-400 text-lg mb-2">No products match "{searchQuery}"</p>
+                            <button onClick={() => setSearchQuery('')} className="text-primary hover:underline">Clear search</button>
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
@@ -788,7 +903,7 @@ const ProductManagement = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-700">
-                                    {(hideEmptyProducts ? products.filter(p => p.units > 0) : products).map((product) => (
+                                    {getFilteredAndSortedProducts().map((product) => (
                                         <tr
                                             key={product._id}
                                             className={`hover:bg-gray-700/50 ${product.units <= 3
