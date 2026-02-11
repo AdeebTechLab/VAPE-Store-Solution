@@ -1,0 +1,22 @@
+--- Data for shop_db_2 ---
+
+--- Recent Products ---
+- ID: 698c24ae6a80521edf4f65b8, Name: Test Open Botel, Units: 1, Price: 1000
+- ID: 698c21326a80521edf4f5ad9, Name: TEST Product, Units: 0, Price: 800
+
+--- Recent Transactions ---
+- ID: 698c72e028d983152ee7686b, Product: Test Open Botel (10ml), Qty: 1, Total: 20, Date: Wed Feb 11 2026 17:15:28 GMT+0500 (Pakistan Standard Time)
+- ID: 698c6659326d69ae21ed1769, Product: Test Open Botel (10ml), Qty: 1, Total: 10, Date: Wed Feb 11 2026 16:22:01 GMT+0500 (Pakistan Standard Time)
+- ID: 698c65c9326d69ae21ed163d, Product: TEST Product, Qty: 1, Total: 800, Date: Wed Feb 11 2026 16:19:37 GMT+0500 (Pakistan Standard Time)
+- ID: 698c6578326d69ae21ed1601, Product: Test Open Botel (10ml), Qty: 1, Total: 10, Date: Wed Feb 11 2026 16:18:16 GMT+0500 (Pakistan Standard Time)
+- ID: 698c6577326d69ae21ed15e7, Product: Test Open Botel (10ml), Qty: 1, Total: 10, Date: Wed Feb 11 2026 16:18:15 GMT+0500 (Pakistan Standard Time)
+- ID: 698c588de794d535dc0374f0, Product: Test Open Botel (10ml), Qty: 1, Total: 10, Date: Wed Feb 11 2026 15:23:09 GMT+0500 (Pakistan Standard Time)
+- ID: 698c588de794d535dc0374e3, Product: Test Open Botel (10ml), Qty: 1, Total: 10, Date: Wed Feb 11 2026 15:23:09 GMT+0500 (Pakistan Standard Time)
+- ID: 698c4f27df4956954b5b0d75, Product: Test Open Botel (10ml), Qty: 1, Total: 10, Date: Wed Feb 11 2026 14:43:03 GMT+0500 (Pakistan Standard Time)
+- ID: 698c318ce28ae942ba7c8e00, Product: Test Open Botel (10ml), Qty: 1, Total: 10, Date: Wed Feb 11 2026 12:36:44 GMT+0500 (Pakistan Standard Time)
+- ID: 698c3131e28ae942ba7c8b4c, Product: Test Open Botel (50ml), Qty: 1, Total: 50, Date: Wed Feb 11 2026 12:35:13 GMT+0500 (Pakistan Standard Time)
+- ID: 698c30f6e28ae942ba7c8aec, Product: Test Open Botel (10ml), Qty: 1, Total: 10, Date: Wed Feb 11 2026 12:34:14 GMT+0500 (Pakistan Standard Time)
+- ID: 698c30f5e28ae942ba7c8ae3, Product: Test Open Botel (10ml), Qty: 1, Total: 10, Date: Wed Feb 11 2026 12:34:13 GMT+0500 (Pakistan Standard Time)
+- ID: 698c25766a80521edf4f6635, Product: Test Open Botel (10ml), Qty: 1, Total: 10, Date: Wed Feb 11 2026 11:45:10 GMT+0500 (Pakistan Standard Time)
+- ID: 698c25766a80521edf4f662f, Product: Test Open Botel (10ml), Qty: 1, Total: 10, Date: Wed Feb 11 2026 11:45:10 GMT+0500 (Pakistan Standard Time)
+- ID: 698c21a66a80521edf4f5b51, Product: TEST Product, Qty: 1, Total: 800, Date: Wed Feb 11 2026 11:28:54 GMT+0500 (Pakistan Standard Time)

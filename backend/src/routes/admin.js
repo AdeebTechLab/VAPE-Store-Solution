@@ -70,6 +70,8 @@ router.get('/shops/:shopId/session-reports', adminController.getSessionReports);
 router.get('/shops/:shopId/session-reports/:reportId', adminController.getSessionReportDetails);
 router.put('/shops/:shopId/session-reports/:reportId/reconcile', adminController.updateSessionReconciliation);
 router.delete('/shops/:shopId/session-reports/:reportId', adminController.deleteSessionReport);
+router.delete('/shops/:shopId/session-reports/:reportId/items/:itemId', adminController.deleteSessionSale);
+router.put('/shops/:shopId/session-reports/:reportId/items/:itemId/price', adminController.updateSessionSalePrice);
 
 // Opened bottles management
 const openedBottleController = require('../controllers/openedBottleController');

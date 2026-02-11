@@ -121,9 +121,15 @@ const sellBulk = asyncHandler(async (req, res) => {
                 }
 
                 const product = await Product.findById(openedBottle.productId);
-                // Use provided price from cart if available, otherwise calculate
-                const calculatedMlPrice = product ? Math.round((product.pricePerUnit / product.mlCapacity) * item.mlAmount) : 0;
+                // Use bottle's stored pricePerUnit (snapshot at open time), fallback to product
+                const bottleSellPrice = openedBottle.pricePerUnit || (product ? product.pricePerUnit : 0);
+                const bottleCostPrice = openedBottle.costPrice || (product ? (product.costPrice || 0) : 0);
+                const bottleCapacity = openedBottle.mlCapacity || (product ? product.mlCapacity : 1);
+                // Use provided price from cart if available, otherwise calculate from bottle pricing
+                const calculatedMlPrice = Math.round((bottleSellPrice / bottleCapacity) * item.mlAmount);
                 const mlPrice = Math.round(item.price !== undefined ? item.price : calculatedMlPrice);
+                const mlCost = Math.round((bottleCostPrice / bottleCapacity) * item.mlAmount);
+                console.log(`[DEBUG] ML Sale: bottleCost=${bottleCostPrice}, capacity=${bottleCapacity}, ml=${item.mlAmount}, mlCost=${mlCost}`);
 
                 // Update opened bottle
                 openedBottle.remainingMl -= item.mlAmount;
@@ -150,6 +156,7 @@ const sellBulk = asyncHandler(async (req, res) => {
                     qty: 1,
                     pricePerUnit: mlPrice,
                     totalPrice: mlPrice,
+                    costPrice: mlCost,
                     originalPrice: item.originalPrice || calculatedMlPrice,
                     cartPrice: item.cartPrice || mlPrice,
                     checkoutId, // Group items from same checkout
@@ -472,6 +479,35 @@ const getActiveSessions = asyncHandler(async (req, res) => {
     });
 });
 
+
+
+/**
+ * Get shopkeeper's past session reports
+ * GET /api/shop/:shopDbName/reports
+ */
+const getShopkeeperReports = asyncHandler(async (req, res) => {
+    const { shopDbName } = req.params;
+
+    // Connect to shop database
+    const shopConn = await getShopConnection(shopDbName);
+    const SessionReport = shopConn.model('SessionReport', sessionReportSchema);
+
+    // Find reports for this shopkeeper (based on user ID in token)
+    // Note: req.user.id is the _id from the shopkeeper collection in admin DB
+    // But in SessionReport we store it as shopkeeperId
+
+    const reports = await SessionReport.find({
+        shopkeeperId: req.user.id
+    })
+        .sort({ startTime: -1 })
+        .limit(50); // Limit to last 50 reports for now
+
+    res.json({
+        success: true,
+        reports
+    });
+});
+
 module.exports = {
     sellProduct,
     sellBulk,
@@ -479,5 +515,6 @@ module.exports = {
     getSessionInfo,
     getSessionTransactions,
     getActiveSessions,
+    getShopkeeperReports,
 };
 

@@ -1,0 +1,13 @@
+--- Cleanup Log ---
+Starting cleanup...
+Config Mongo URI: mongodb+srv://adeebtechnologylab_db_user:***@vapeshopcluster.xye9z72.mongodb.net/
+
+--- All Shops (2) ---
+- Name: "Shop 1", DB: "shop_db_1"
+- Name: "Shop 2", DB: "shop_db_2"
+
+Selected Database: shop_db_2
+Connected to Shop Connection Name: undefined
+Total Products in shop_db_2: 0
+Found 0 target products.
+No products found matching target IDs. Aborting cleanup.

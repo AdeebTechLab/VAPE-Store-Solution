@@ -1,0 +1,8 @@
+{
+  "name": "Test Open Botel",
+  "pricePerUnit": 992,
+  "costPrice": 500,
+  "mlCapacity": 1000,
+  "remainingMl": 900,
+  "status": "open"
+}

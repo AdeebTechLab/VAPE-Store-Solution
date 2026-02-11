@@ -78,27 +78,8 @@ const getAllShops = asyncHandler(async (req, res) => {
 
                 // ===== TOTAL PROFIT =====
                 // Sum of (sellPrice - costPrice) × qty for all SOLD items
+                // costPrice is stored directly on each transaction (set by controller fixes)
                 const profitFromSales = await Transaction.aggregate([
-                    {
-                        $lookup: {
-                            from: 'products',
-                            localField: 'productId',
-                            foreignField: '_id',
-                            as: 'product'
-                        }
-                    },
-                    {
-                        $addFields: {
-                            // Use transaction costPrice if > 0, otherwise use product costPrice
-                            effectiveCostPrice: {
-                                $cond: {
-                                    if: { $gt: ['$costPrice', 0] },
-                                    then: '$costPrice',
-                                    else: { $ifNull: [{ $arrayElemAt: ['$product.costPrice', 0] }, 0] }
-                                }
-                            }
-                        }
-                    },
                     {
                         $group: {
                             _id: null,
@@ -106,7 +87,7 @@ const getAllShops = asyncHandler(async (req, res) => {
                             totalProfit: {
                                 $sum: {
                                     $multiply: [
-                                        { $subtract: ['$pricePerUnit', '$effectiveCostPrice'] },
+                                        { $subtract: ['$pricePerUnit', { $ifNull: ['$costPrice', 0] }] },
                                         '$qty'
                                     ]
                                 }
@@ -988,29 +969,10 @@ const getAllShopsFilteredStats = asyncHandler(async (req, res) => {
             const profitAgg = await Transaction.aggregate([
                 { $match: matchQuery },
                 {
-                    $lookup: {
-                        from: 'products',
-                        localField: 'productId',
-                        foreignField: '_id',
-                        as: 'product'
-                    }
-                },
-                {
-                    $addFields: {
-                        effectiveCostPrice: {
-                            $cond: {
-                                if: { $gt: ['$costPrice', 0] },
-                                then: '$costPrice',
-                                else: { $ifNull: [{ $arrayElemAt: ['$product.costPrice', 0] }, 0] }
-                            }
-                        }
-                    }
-                },
-                {
                     $group: {
                         _id: null,
                         totalProfit: {
-                            $sum: { $multiply: [{ $subtract: ['$pricePerUnit', '$effectiveCostPrice'] }, '$qty'] }
+                            $sum: { $multiply: [{ $subtract: ['$pricePerUnit', { $ifNull: ['$costPrice', 0] }] }, '$qty'] }
                         }
                     }
                 }
@@ -1100,29 +1062,10 @@ const getShopFilteredStats = asyncHandler(async (req, res) => {
     const profitAgg = await Transaction.aggregate([
         { $match: matchQuery },
         {
-            $lookup: {
-                from: 'products',
-                localField: 'productId',
-                foreignField: '_id',
-                as: 'product'
-            }
-        },
-        {
-            $addFields: {
-                effectiveCostPrice: {
-                    $cond: {
-                        if: { $gt: ['$costPrice', 0] },
-                        then: '$costPrice',
-                        else: { $ifNull: [{ $arrayElemAt: ['$product.costPrice', 0] }, 0] }
-                    }
-                }
-            }
-        },
-        {
             $group: {
                 _id: null,
                 totalProfit: {
-                    $sum: { $multiply: [{ $subtract: ['$pricePerUnit', '$effectiveCostPrice'] }, '$qty'] }
+                    $sum: { $multiply: [{ $subtract: ['$pricePerUnit', { $ifNull: ['$costPrice', 0] }] }, '$qty'] }
                 }
             }
         }
@@ -1157,6 +1100,189 @@ const getShopFilteredStats = asyncHandler(async (req, res) => {
     });
 });
 
+/**
+ * Delete a specific sale item from a session report
+ * DELETE /api/admin/shops/:shopId/session-reports/:reportId/items/:itemId
+ */
+const deleteSessionSale = asyncHandler(async (req, res) => {
+    const { shopId, reportId, itemId } = req.params;
+
+    // Get shop info
+    const adminConn = await connectAdminDB();
+    const Shop = adminConn.model('Shop', shopSchema);
+    const shop = await Shop.findById(shopId);
+
+    if (!shop) {
+        return res.status(404).json({
+            success: false,
+            message: 'Shop not found',
+        });
+    }
+
+    // Connect to shop database
+    const shopConn = await getShopConnection(shop.dbName);
+    const SessionReport = shopConn.model('SessionReport', sessionReportSchema);
+    const Transaction = shopConn.model('Transaction', transactionSchema);
+
+    // Find the report
+    const report = await SessionReport.findById(reportId);
+    if (!report) {
+        return res.status(404).json({
+            success: false,
+            message: 'Session report not found',
+        });
+    }
+
+    // Find the item in the report
+    const itemIndex = report.soldItems.findIndex(item => item._id.toString() === itemId);
+    if (itemIndex === -1) {
+        return res.status(404).json({
+            success: false,
+            message: 'Sale item not found in report',
+        });
+    }
+
+    const itemToDelete = report.soldItems[itemIndex];
+
+    // Find and delete the corresponding transaction to update profit/analytics
+    // We match by sessionId, productId, and soldAt (timestamp)
+    const transactionQuery = {
+        sessionId: report.sessionId,
+        productId: itemToDelete.productId,
+        soldAt: itemToDelete.soldAt
+    };
+
+    // Attempt to find and delete the transaction
+    const deletedTransaction = await Transaction.findOneAndDelete(transactionQuery);
+
+    if (!deletedTransaction) {
+        console.warn(`Warning: Corresponding transaction not found for session item deletion. 
+            Session: ${report.sessionId}, Product: ${itemToDelete.productName}, Time: ${itemToDelete.soldAt}`);
+    } else {
+        console.log(`Deleted transaction for product ${itemToDelete.productName} in session ${report.sessionId}`);
+    }
+
+    // Remove item from report
+    report.soldItems.splice(itemIndex, 1);
+
+    // Recalculate totals
+    report.totalAmount = report.soldItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+    report.totalItemsSold = report.soldItems.reduce((sum, item) => sum + (item.qty || 0), 0);
+
+    await report.save();
+
+    res.json({
+        success: true,
+        message: 'Sale item deleted successfully',
+        report: {
+            ...report.toObject(),
+        }
+    });
+});
+
+/**
+ * Update a specific sale item's price in a session report
+ * PUT /api/admin/shops/:shopId/session-reports/:reportId/items/:itemId/price
+ */
+const updateSessionSalePrice = asyncHandler(async (req, res) => {
+    const { shopId, reportId, itemId } = req.params;
+    const { newPrice } = req.body;
+
+    if (newPrice === undefined || newPrice < 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'Valid price is required',
+        });
+    }
+
+    // Get shop info
+    const adminConn = await connectAdminDB();
+    const Shop = adminConn.model('Shop', shopSchema);
+    const shop = await Shop.findById(shopId);
+
+    if (!shop) {
+        return res.status(404).json({
+            success: false,
+            message: 'Shop not found',
+        });
+    }
+
+    // Connect to shop database
+    const shopConn = await getShopConnection(shop.dbName);
+    const SessionReport = shopConn.model('SessionReport', sessionReportSchema);
+    const Transaction = shopConn.model('Transaction', transactionSchema);
+
+    // Find the report
+    const report = await SessionReport.findById(reportId);
+    if (!report) {
+        return res.status(404).json({
+            success: false,
+            message: 'Session report not found',
+        });
+    }
+
+    // Find the item in the report
+    const itemIndex = report.soldItems.findIndex(item => item._id.toString() === itemId);
+    if (itemIndex === -1) {
+        return res.status(404).json({
+            success: false,
+            message: 'Sale item not found in report',
+        });
+    }
+
+    const itemToUpdate = report.soldItems[itemIndex];
+    const oldPrice = itemToUpdate.pricePerUnit;
+    const quantity = itemToUpdate.qty || 0;
+
+    // Calculate new total for this item
+    const newTotal = newPrice * quantity;
+
+    // Find and update the corresponding transaction
+    const transactionQuery = {
+        sessionId: report.sessionId,
+        productId: itemToUpdate.productId,
+        soldAt: itemToUpdate.soldAt
+    };
+
+    const updatedTransaction = await Transaction.findOneAndUpdate(
+        transactionQuery,
+        {
+            pricePerUnit: newPrice,
+            totalPrice: newTotal
+        },
+        { new: true }
+    );
+
+    if (!updatedTransaction) {
+        console.warn(`Warning: Corresponding transaction not found for session item price update. 
+            Session: ${report.sessionId}, Product: ${itemToUpdate.productName}`);
+    } else {
+        console.log(`Updated transaction price for ${itemToUpdate.productName}: ${oldPrice} -> ${newPrice}`);
+    }
+
+    // Update item in report
+    report.soldItems[itemIndex].pricePerUnit = newPrice;
+    report.soldItems[itemIndex].totalPrice = newTotal;
+
+    // Recalculate session totals
+    report.totalAmount = report.soldItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+
+    // Update remaining balance if cash was submitted
+    if (report.cashSubmitted) {
+        report.remainingBalance = report.totalAmount - report.cashSubmitted;
+    }
+
+    await report.save();
+
+    res.json({
+        success: true,
+        message: 'Sale price updated successfully',
+        report: {
+            ...report.toObject(),
+        }
+    });
+});
+
 module.exports = {
     getAllShops,
     createShop,
@@ -1173,4 +1299,6 @@ module.exports = {
     updateSessionReconciliation,
     getAllShopsFilteredStats,
     getShopFilteredStats,
+    deleteSessionSale,
+    updateSessionSalePrice,
 };

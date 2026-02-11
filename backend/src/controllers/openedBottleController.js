@@ -49,6 +49,8 @@ const openBottle = asyncHandler(async (req, res) => {
         productBrand: product.brand,
         mlCapacity: product.mlCapacity,
         remainingMl: product.mlCapacity,
+        pricePerUnit: product.pricePerUnit || 0,
+        costPrice: product.costPrice || 0,
         imageUrl: product.imageUrl,
         openedBy: username,
         status: 'open',
@@ -80,6 +82,8 @@ const getOpenedBottles = asyncHandler(async (req, res) => {
     const shopConn = await getShopConnection(shopDbName);
     const OpenedBottle = shopConn.model('OpenedBottle', openedBottleSchema);
 
+    const Product = shopConn.model('Product', productSchema);
+
     const query = {};
     if (status) {
         query.status = status;
@@ -87,10 +91,23 @@ const getOpenedBottles = asyncHandler(async (req, res) => {
 
     const openedBottles = await OpenedBottle.find(query).sort({ openedAt: -1 });
 
+    // Enrich with pricePerMl for display
+    const enrichedBottles = await Promise.all(openedBottles.map(async (bottle) => {
+        const b = bottle.toObject();
+        // Use stored pricePerUnit, or fallback to product lookup
+        let price = b.pricePerUnit || 0;
+        if (!price) {
+            const product = await Product.findById(b.productId);
+            price = product?.pricePerUnit || 0;
+        }
+        b.pricePerMl = b.mlCapacity > 0 ? price / b.mlCapacity : 0;
+        return b;
+    }));
+
     res.json({
         success: true,
-        count: openedBottles.length,
-        openedBottles,
+        count: enrichedBottles.length,
+        openedBottles: enrichedBottles,
     });
 });
 
@@ -145,7 +162,12 @@ const sellMl = asyncHandler(async (req, res) => {
 
     // Calculate price for the ML sold (round to avoid floating-point issues)
     // Price per ML = bottle price / bottle capacity
-    const mlPrice = Math.round(pricePerMl || (product ? (product.pricePerUnit / product.mlCapacity) * mlToSell : 0));
+    // Use bottle's stored pricePerUnit (snapshot at open time), fallback to product
+    const bottleSellPrice = openedBottle.pricePerUnit || (product ? product.pricePerUnit : 0);
+    const bottleCostPrice = openedBottle.costPrice || (product ? product.costPrice : 0);
+    const bottleCapacity = openedBottle.mlCapacity || (product ? product.mlCapacity : 1);
+    const mlPrice = Math.round(pricePerMl || (bottleSellPrice / bottleCapacity) * mlToSell);
+    const mlCost = Math.round((bottleCostPrice / bottleCapacity) * mlToSell);
     const totalPrice = mlPrice;
 
     // Subtract ML
@@ -166,7 +188,9 @@ const sellMl = asyncHandler(async (req, res) => {
             qty: 1, // 1 ML sale transaction
             pricePerUnit: totalPrice,
             totalPrice: totalPrice,
+            costPrice: mlCost,
             soldByShopkeeperId: req.user?.id,
+            soldBy: username,
             sessionId,
         });
         await transaction.save();
@@ -249,11 +273,24 @@ const getOpenedBottlesAdmin = asyncHandler(async (req, res) => {
     const OpenedBottle = shopConn.model('OpenedBottle', openedBottleSchema);
 
     // Get all opened bottles (including empty ones for admin view)
+    const Product = shopConn.model('Product', productSchema);
     const bottles = await OpenedBottle.find().sort({ createdAt: -1 });
+
+    // Enrich with pricePerMl for analytics display
+    const enrichedBottles = await Promise.all(bottles.map(async (bottle) => {
+        const b = bottle.toObject();
+        let price = b.pricePerUnit || 0;
+        if (!price) {
+            const product = await Product.findById(b.productId);
+            price = product?.pricePerUnit || 0;
+        }
+        b.pricePerMl = b.mlCapacity > 0 ? price / b.mlCapacity : 0;
+        return b;
+    }));
 
     res.json({
         success: true,
-        openedBottles: bottles,
+        openedBottles: enrichedBottles,
     });
 });
 

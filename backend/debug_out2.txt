@@ -1,0 +1,9 @@
+Test Open Botel (10ml) | qty=1 | price=10 | cost=5 | profit=5
+Test Open Botel (50ml) | qty=1 | price=50 | cost=25 | profit=25
+Test Open Botel (10ml) | qty=1 | price=10 | cost=5 | profit=5
+Test Open Botel (10ml) | qty=1 | price=10 | cost=5 | profit=5
+Test Open Botel (10ml) | qty=1 | price=10 | cost=5 | profit=5
+Test Open Botel (10ml) | qty=1 | price=10 | cost=5 | profit=5
+TEST Product | qty=1 | price=800 | cost=500 | profit=300
+
+Sum profit: 350

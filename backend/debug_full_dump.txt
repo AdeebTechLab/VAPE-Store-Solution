@@ -1,0 +1,229 @@
+=== ALL TRANSACTIONS (newest first) ===
+
+{
+  "name": "Test Open Botel (10ml)",
+  "qty": 1,
+  "pricePerUnit": 10,
+  "totalPrice": 10,
+  "costPrice": 0,
+  "originalPrice": 9.92,
+  "cartPrice": 9.92,
+  "soldAt": "2026-02-11T10:23:09.756Z",
+  "soldBy": "Faheem",
+  "sessionId": "37a29a2c-55f4-43de-b7a7-71e5d9386a14",
+  "_id": "698c588de794d535dc0374f0"
+}
+
+{
+  "name": "Test Open Botel (10ml)",
+  "qty": 1,
+  "pricePerUnit": 10,
+  "totalPrice": 10,
+  "costPrice": 0,
+  "originalPrice": 9.92,
+  "cartPrice": 9.92,
+  "soldAt": "2026-02-11T10:23:09.238Z",
+  "soldBy": "Faheem",
+  "sessionId": "37a29a2c-55f4-43de-b7a7-71e5d9386a14",
+  "_id": "698c588de794d535dc0374e3"
+}
+
+{
+  "name": "Test Open Botel (10ml)",
+  "qty": 1,
+  "pricePerUnit": 10,
+  "totalPrice": 10,
+  "costPrice": 5,
+  "originalPrice": 9.92,
+  "cartPrice": 9.92,
+  "soldAt": "2026-02-11T09:43:03.440Z",
+  "soldBy": "Faheem",
+  "sessionId": "37a29a2c-55f4-43de-b7a7-71e5d9386a14",
+  "_id": "698c4f27df4956954b5b0d75"
+}
+
+{
+  "name": "Test Open Botel (10ml)",
+  "qty": 1,
+  "pricePerUnit": 10,
+  "totalPrice": 10,
+  "costPrice": 5,
+  "originalPrice": 9.92,
+  "cartPrice": 9.92,
+  "soldAt": "2026-02-11T07:36:44.583Z",
+  "soldBy": "Faheem",
+  "sessionId": "ba754279-7db3-4b1b-a872-f1850a042af8",
+  "_id": "698c318ce28ae942ba7c8e00"
+}
+
+{
+  "name": "Test Open Botel (50ml)",
+  "qty": 1,
+  "pricePerUnit": 50,
+  "totalPrice": 50,
+  "costPrice": 25,
+  "originalPrice": 49.6,
+  "cartPrice": 49.6,
+  "soldAt": "2026-02-11T07:35:13.219Z",
+  "soldBy": "Faheem",
+  "sessionId": "609039a4-4681-4baf-8b45-27c9bd9dddbd",
+  "_id": "698c3131e28ae942ba7c8b4c"
+}
+
+{
+  "name": "Test Open Botel (10ml)",
+  "qty": 1,
+  "pricePerUnit": 10,
+  "totalPrice": 10,
+  "costPrice": 5,
+  "originalPrice": 9.92,
+  "cartPrice": 9.92,
+  "soldAt": "2026-02-11T07:34:14.567Z",
+  "soldBy": "Faheem",
+  "sessionId": "609039a4-4681-4baf-8b45-27c9bd9dddbd",
+  "_id": "698c30f6e28ae942ba7c8aec"
+}
+
+{
+  "name": "Test Open Botel (10ml)",
+  "qty": 1,
+  "pricePerUnit": 10,
+  "totalPrice": 10,
+  "costPrice": 5,
+  "originalPrice": 9.92,
+  "cartPrice": 9.92,
+  "soldAt": "2026-02-11T07:34:13.600Z",
+  "soldBy": "Faheem",
+  "sessionId": "609039a4-4681-4baf-8b45-27c9bd9dddbd",
+  "_id": "698c30f5e28ae942ba7c8ae3"
+}
+
+{
+  "name": "Test Open Botel (10ml)",
+  "qty": 1,
+  "pricePerUnit": 10,
+  "totalPrice": 10,
+  "costPrice": 5,
+  "originalPrice": 9.92,
+  "cartPrice": 9.92,
+  "soldAt": "2026-02-11T06:45:10.895Z",
+  "soldBy": "Faheem",
+  "sessionId": "609039a4-4681-4baf-8b45-27c9bd9dddbd",
+  "_id": "698c25766a80521edf4f6635"
+}
+
+{
+  "name": "Test Open Botel (10ml)",
+  "qty": 1,
+  "pricePerUnit": 10,
+  "totalPrice": 10,
+  "costPrice": 5,
+  "originalPrice": 9.92,
+  "cartPrice": 9.92,
+  "soldAt": "2026-02-11T06:45:10.481Z",
+  "soldBy": "Faheem",
+  "sessionId": "609039a4-4681-4baf-8b45-27c9bd9dddbd",
+  "_id": "698c25766a80521edf4f662f"
+}
+
+{
+  "name": "TEST Product",
+  "qty": 1,
+  "pricePerUnit": 800,
+  "totalPrice": 800,
+  "costPrice": 500,
+  "originalPrice": 800,
+  "cartPrice": 800,
+  "soldAt": "2026-02-11T06:28:54.122Z",
+  "soldBy": "Faheem",
+  "sessionId": "090acd22-fcdb-48ef-bee2-870c4891d2ea",
+  "_id": "698c21a66a80521edf4f5b51"
+}
+
+
+=== OPENED BOTTLES ===
+
+{
+  "name": "Test Open Botel",
+  "pricePerUnit": 992,
+  "costPrice": 500,
+  "mlCapacity": 1000,
+  "remainingMl": 870,
+  "status": "open",
+  "salesHistory": [
+    {
+      "mlSold": 10,
+      "soldAt": "2026-02-11T06:45:10.288Z",
+      "soldBy": "Faheem",
+      "_id": "698c25766a80521edf4f662c"
+    },
+    {
+      "mlSold": 10,
+      "soldAt": "2026-02-11T06:45:10.705Z",
+      "soldBy": "Faheem",
+      "_id": "698c25766a80521edf4f6633"
+    },
+    {
+      "mlSold": 10,
+      "soldAt": "2026-02-11T07:34:13.384Z",
+      "soldBy": "Faheem",
+      "_id": "698c30f5e28ae942ba7c8ae1"
+    },
+    {
+      "mlSold": 10,
+      "soldAt": "2026-02-11T07:34:14.369Z",
+      "soldBy": "Faheem",
+      "_id": "698c30f6e28ae942ba7c8aea"
+    },
+    {
+      "mlSold": 50,
+      "soldAt": "2026-02-11T07:35:13.021Z",
+      "soldBy": "Faheem",
+      "_id": "698c3131e28ae942ba7c8b4a"
+    },
+    {
+      "mlSold": 10,
+      "soldAt": "2026-02-11T07:36:44.344Z",
+      "soldBy": "Faheem",
+      "_id": "698c318ce28ae942ba7c8dfe"
+    },
+    {
+      "mlSold": 10,
+      "soldAt": "2026-02-11T09:43:03.241Z",
+      "soldBy": "Faheem",
+      "_id": "698c4f27df4956954b5b0d73"
+    },
+    {
+      "mlSold": 10,
+      "soldAt": "2026-02-11T10:23:09.027Z",
+      "soldBy": "Faheem",
+      "_id": "698c588de794d535dc0374e0"
+    },
+    {
+      "mlSold": 10,
+      "soldAt": "2026-02-11T10:23:09.558Z",
+      "soldBy": "Faheem",
+      "_id": "698c588de794d535dc0374ee"
+    }
+  ]
+}
+
+
+=== PRODUCTS ===
+
+{
+  "name": "TEST Product",
+  "pricePerUnit": 800,
+  "costPrice": 500,
+  "units": 2,
+  "mlCapacity": 0
+}
+
+{
+  "name": "Test Open Botel",
+  "pricePerUnit": 992,
+  "costPrice": 500,
+  "units": 1,
+  "mlCapacity": 1000
+}
+

@@ -22,6 +22,14 @@ const openedBottleSchema = new mongoose.Schema({
         type: Number,
         required: true,
     },
+    pricePerUnit: {
+        type: Number,
+        default: 0, // Selling price of the full bottle at time of opening
+    },
+    costPrice: {
+        type: Number,
+        default: 0, // Cost price of the full bottle at time of opening
+    },
     imageUrl: {
         type: String,
         default: '',

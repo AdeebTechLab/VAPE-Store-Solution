@@ -126,6 +126,60 @@ const SessionReports = () => {
         }
     };
 
+    const handleDeleteSale = async (reportId, itemId) => {
+        if (!confirm('Are you sure you want to delete this sale? This will also remove the transaction and adjust profits.')) return;
+
+        try {
+            const response = await api.delete(`/admin/shops/${shopId}/session-reports/${reportId}/items/${itemId}`);
+            if (response.data.success) {
+                // Update local state
+                const updatedReport = response.data.report;
+                setSelectedReport(updatedReport);
+
+                // Also update the report in the list
+                setReports(prev => prev.map(r => r._id === reportId ? updatedReport : r));
+            }
+        } catch (error) {
+            console.error('Error deleting sale:', error);
+            alert('Failed to delete sale item');
+        }
+    };
+
+    // Edit Price State
+    const [editingItem, setEditingItem] = useState(null);
+    const [newPrice, setNewPrice] = useState('');
+
+    const handleUpdatePrice = async () => {
+        if (!editingItem || !newPrice) return;
+
+        const price = parseFloat(newPrice);
+        if (isNaN(price) || price < 0) {
+            alert('Please enter a valid price');
+            return;
+        }
+
+        try {
+            const response = await api.put(`/admin/shops/${shopId}/session-reports/${selectedReport._id}/items/${editingItem._id}/price`, {
+                newPrice: price
+            });
+
+            if (response.data.success) {
+                // Update local state
+                const updatedReport = response.data.report;
+                setSelectedReport(updatedReport);
+
+                // Also update the report in the list
+                setReports(prev => prev.map(r => r._id === updatedReport._id ? updatedReport : r));
+
+                setEditingItem(null);
+                setNewPrice('');
+            }
+        } catch (error) {
+            console.error('Error updating price:', error);
+            alert('Failed to update price');
+        }
+    };
+
     const handleDeposit = async (session, e) => {
         e.stopPropagation(); // Prevent card click
         const depositAmount = parseFloat(depositInputs[session._id]) || 0;
@@ -660,9 +714,11 @@ const SessionReports = () => {
                                                                     const hasCheckoutDiscount = paidUnitPrice < cartUnitPrice;
 
                                                                     return (
-                                                                        <div key={itemIdx} className="flex justify-between items-center py-2 border-b border-gray-600/30 last:border-0">
-                                                                            <div>
-                                                                                <p className="text-white">{item.productName}</p>
+                                                                        <div key={itemIdx} className="flex justify-between items-center py-2 border-b border-gray-600/30 last:border-0 hover:bg-gray-700/30 px-2 rounded-lg transition-colors group">
+                                                                            <div className="flex-1">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <p className="text-white">{item.productName}</p>
+                                                                                </div>
                                                                                 <div className="text-sm">
                                                                                     {hasManualEdit ? (
                                                                                         <span className={isMarkup ? 'text-blue-400' : 'text-green-400'}>
@@ -679,7 +735,41 @@ const SessionReports = () => {
                                                                                     )}
                                                                                 </div>
                                                                             </div>
-                                                                            <span className={`font-medium ${hasCheckoutDiscount ? 'text-purple-400' : 'text-gray-300'}`}>Rs {(item.totalPrice || (cartUnitPrice * item.qty)).toFixed(0)}</span>
+
+                                                                            <div className="flex items-center gap-4">
+                                                                                <span className={`font-medium ${hasCheckoutDiscount ? 'text-purple-400' : 'text-gray-300'}`}>
+                                                                                    Rs {(item.totalPrice || (cartUnitPrice * item.qty)).toFixed(0)}
+                                                                                </span>
+
+                                                                                {/* Edit Item Price Button */}
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        setEditingItem(item);
+                                                                                        setNewPrice(item.pricePerUnit);
+                                                                                    }}
+                                                                                    className="p-1.5 bg-blue-500/10 text-blue-400 hover:text-white hover:bg-blue-600 rounded-lg transition-all mr-2"
+                                                                                    title="Edit Price"
+                                                                                >
+                                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                                                    </svg>
+                                                                                </button>
+
+                                                                                {/* Delete Item Button */}
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        handleDeleteSale(selectedReport._id, item._id);
+                                                                                    }}
+                                                                                    className="p-1.5 bg-red-500/10 text-red-400 hover:text-white hover:bg-red-600 rounded-lg transition-all"
+                                                                                    title="Delete this sale"
+                                                                                >
+                                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                                    </svg>
+                                                                                </button>
+                                                                            </div>
                                                                         </div>
                                                                     );
                                                                 })();
@@ -909,6 +999,44 @@ const SessionReports = () => {
                     </div>
                 );
             })()}
+            {/* Edit Price Modal */}
+            {editingItem && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-gray-800 rounded-xl p-6 w-full max-w-sm border border-gray-700">
+                        <h3 className="text-xl font-bold text-white mb-4">Edit Sale Price</h3>
+                        <p className="text-gray-400 mb-4">
+                            Update price for <span className="text-white font-medium">{editingItem.productName}</span>
+                        </p>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-400 mb-1">New Price (per unit)</label>
+                            <input
+                                type="number"
+                                value={newPrice}
+                                onChange={(e) => setNewPrice(e.target.value)}
+                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                                placeholder="Enter new price"
+                                autoFocus
+                            />
+                        </div>
+
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => setEditingItem(null)}
+                                className="px-4 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleUpdatePrice}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                            >
+                                Update Price
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

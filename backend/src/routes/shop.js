@@ -28,6 +28,7 @@ router.post('/:shopDbName/sell-bulk', salesController.sellBulk);
 // Session management
 router.get('/:shopDbName/session', salesController.getSessionInfo);
 router.get('/:shopDbName/transactions', salesController.getSessionTransactions);
+router.get('/:shopDbName/reports', salesController.getShopkeeperReports);
 router.post('/:shopDbName/logout', salesController.logoutAndGenerateReport);
 
 // E-Liquid Opened Bottle operations

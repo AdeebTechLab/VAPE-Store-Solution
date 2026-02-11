@@ -1,0 +1,8 @@
+Test Open Botel (10ml) | qty=1 | price=10 | cost=0 | total=10
+Test Open Botel (10ml) | qty=1 | price=10 | cost=5 | total=10
+Test Open Botel (50ml) | qty=1 | price=50 | cost=25 | total=50
+Test Open Botel (10ml) | qty=1 | price=10 | cost=5 | total=10
+Test Open Botel (10ml) | qty=1 | price=10 | cost=5 | total=10
+Test Open Botel (10ml) | qty=1 | price=10 | cost=5 | total=10
+Test Open Botel (10ml) | qty=1 | price=10 | cost=5 | total=10
+TEST Product | qty=1 | price=800 | cost=500 | total=800

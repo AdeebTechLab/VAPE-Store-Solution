@@ -11,6 +11,7 @@ import AllReconciliationList from './pages/admin/AllReconciliationList';
 import Analytics from './pages/admin/Analytics';
 import ManageShops from './pages/admin/ManageShops';
 import ShopHome from './pages/shop/Home';
+import ShopkeeperReports from './pages/shop/ShopkeeperReports';
 import './index.css';
 
 // Protected Route Component
@@ -141,6 +142,14 @@ function AppRoutes() {
                 element={
                     <ProtectedRoute requiredRole="shopkeeper">
                         <ShopHome />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/shop/reports"
+                element={
+                    <ProtectedRoute requiredRole="shopkeeper">
+                        <ShopkeeperReports />
                     </ProtectedRoute>
                 }
             />
