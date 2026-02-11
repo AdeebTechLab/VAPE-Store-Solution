@@ -9,6 +9,11 @@ A full-stack MERN (MongoDB, Express, React, Node.js) application for managing va
 
 ## 🚀 Features
 
+
+
+
+
+
 ### Admin Features
 - **Multi-Shop Management**: Manage 3+ vape shops from a single dashboard
 - **Product Management**: Add, edit, delete products with image uploads
