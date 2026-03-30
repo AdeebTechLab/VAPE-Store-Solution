@@ -33,7 +33,10 @@ const seedDatabase = async () => {
             await admin.save();
             console.log(`✓ Created admin user: ${config.adminUsername}`);
         } else {
-            console.log('✓ Admin user already exists');
+            // Update existing admin password to match configured password
+            existingAdmin.passwordHash = config.adminPassword; // Will be hashed by pre-save hook
+            await existingAdmin.save();
+            console.log(`✓ Updated admin user password: ${config.adminUsername}`);
         }
 
         // Create 3 shops if they don't exist

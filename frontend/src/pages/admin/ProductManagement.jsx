@@ -670,7 +670,7 @@ const ProductManagement = () => {
                                             value={formData.units}
                                             onChange={(e) => setFormData({ ...formData, units: Number(e.target.value) || '' })}
                                             className="input text-center flex-1"
-                                            placeholder="1"
+                                            placeholder="e.g., 50"
                                             min="1"
                                             required
                                         />

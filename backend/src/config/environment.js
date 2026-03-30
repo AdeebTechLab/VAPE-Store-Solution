@@ -1,8 +1,8 @@
 require('dotenv').config();
 
 const config = {
-  adminUsername: process.env.ADMIN_USERNAME || 'shani',
-  adminPassword: process.env.ADMIN_PASSWORD || 'shani933',
+  adminUsername: process.env.ADMIN_USERNAME || 'admin',
+  adminPassword: process.env.ADMIN_PASSWORD || 'Zishi@321',
   jwtSecret: process.env.JWT_SECRET || 'default_secret_change_this',
   mongoUri: process.env.MONGO_URI || 'mongodb://localhost:27017',
   shopDbPrefix: process.env.SHOP_DB_PREFIX || 'shop_db_',
@@ -21,7 +21,7 @@ if (config.nodeEnv === 'production') {
     console.error('ERROR: JWT_SECRET must be set in production!');
     process.exit(1);
   }
-  if (config.adminPassword === 'vapeshop121!') {
+  if (config.adminPassword === 'Zishi@321') {
     console.warn('WARNING: Default admin password detected in production! Please change immediately.');
   }
 }

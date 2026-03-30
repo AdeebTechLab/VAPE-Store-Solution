@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
 let socket = null;
+let pendingRooms = []; // Queue of rooms to join once connected
 
 /**
  * Connect to Socket.io server
@@ -10,15 +11,32 @@ let socket = null;
 export const connectSocket = () => {
     if (socket?.connected) return socket;
 
+    // If socket exists but is reconnecting, don't create a new one
+    if (socket) return socket;
+
     socket = io(BACKEND_URL, {
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: Infinity,
         reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
     });
 
     socket.on('connect', () => {
         console.log('🔌 Socket connected:', socket.id);
+        // Replay any pending room joins
+        pendingRooms.forEach(({ event, data }) => {
+            socket.emit(event, data);
+            console.log(`📍 Replayed pending room join: ${event}`, data || '');
+        });
+    });
+
+    // On reconnect, re-join all rooms automatically
+    socket.on('reconnect', () => {
+        console.log('🔌 Socket reconnected, re-joining rooms...');
+        pendingRooms.forEach(({ event, data }) => {
+            socket.emit(event, data);
+        });
     });
 
     socket.on('disconnect', () => {
@@ -39,6 +57,7 @@ export const disconnectSocket = () => {
     if (socket) {
         socket.disconnect();
         socket = null;
+        pendingRooms = [];
     }
 };
 
@@ -51,6 +70,11 @@ export const getSocket = () => socket;
  * Join a shop room to receive shop-specific updates
  */
 export const joinShopRoom = (shopDbName) => {
+    // Always remember this room so we can re-join on reconnect
+    const existing = pendingRooms.find(r => r.event === 'join:shop' && r.data === shopDbName);
+    if (!existing) {
+        pendingRooms.push({ event: 'join:shop', data: shopDbName });
+    }
     if (socket?.connected) {
         socket.emit('join:shop', shopDbName);
     }
@@ -60,6 +84,11 @@ export const joinShopRoom = (shopDbName) => {
  * Join admin room to receive admin-specific updates
  */
 export const joinAdminRoom = () => {
+    // Always remember this room so we can re-join on reconnect
+    const existing = pendingRooms.find(r => r.event === 'join:admin');
+    if (!existing) {
+        pendingRooms.push({ event: 'join:admin' });
+    }
     if (socket?.connected) {
         socket.emit('join:admin');
     }
