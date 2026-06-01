@@ -53,8 +53,8 @@ const Login = () => {
         setLoading(true);
 
         const credentials = role === 'admin'
-            ? { username, password }
-            : { shopId, username, password };
+            ? { username: username.trim(), password }
+            : { shopId, username: username.trim(), password };
 
         const result = await login(credentials, role);
 

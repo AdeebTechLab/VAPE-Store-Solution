@@ -12,7 +12,7 @@ const config = {
   uploadPath: process.env.UPLOAD_PATH || './uploads',
   jwtExpiration: '24h',
   bcryptRounds: 12,
-  adminDbName: 'vapeshop_admin',
+  adminDbName: process.env.ADMIN_DB_NAME || 'vapeshop_admin',
 };
 
 // Validate critical environment variables

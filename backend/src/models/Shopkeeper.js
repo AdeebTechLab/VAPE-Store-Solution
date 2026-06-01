@@ -35,9 +35,13 @@ const shopkeeperSchema = new mongoose.Schema({
     },
 });
 
-// Hash password before saving (updated for Mongoose 7+)
+// Hash password before saving (skip if already bcrypt-hashed)
 shopkeeperSchema.pre('save', async function () {
     if (!this.isModified('passwordHash')) {
+        return;
+    }
+
+    if (/^\$2[aby]\$\d{2}\$/.test(this.passwordHash)) {
         return;
     }
 

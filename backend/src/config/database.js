@@ -4,6 +4,27 @@ const config = require('./environment');
 // Store database connections
 const connections = {};
 
+const getConnectionOptions = (mongoUri) => {
+    const options = {
+        serverSelectionTimeoutMS: 30000,
+        connectTimeoutMS: 30000,
+    };
+
+    // TLS only for MongoDB Atlas (mongodb+srv)
+    if (mongoUri.startsWith('mongodb+srv://')) {
+        options.tls = true;
+        options.tlsAllowInvalidCertificates = true;
+    }
+
+    return options;
+};
+
+const openConnection = async (dbUri, mongoUri) => {
+    const connection = mongoose.createConnection(dbUri, getConnectionOptions(mongoUri));
+    await connection.asPromise();
+    return connection;
+};
+
 /**
  * Connect to the admin database
  */
@@ -17,15 +38,7 @@ const connectAdminDB = async () => {
         const baseUri = config.mongoUri.replace(/\/$/, '');
         const adminDbUri = `${baseUri}/${config.adminDbName}`;
 
-        // TLS options for Node.js v22 compatibility with MongoDB Atlas
-        const connectionOptions = {
-            tls: true,
-            tlsAllowInvalidCertificates: true,
-            serverSelectionTimeoutMS: 30000,
-            connectTimeoutMS: 30000,
-        };
-
-        connections.admin = await mongoose.createConnection(adminDbUri, connectionOptions);
+        connections.admin = await openConnection(adminDbUri, config.mongoUri);
 
         console.log(`✓ Connected to Admin DB: ${config.adminDbName}`);
         return connections.admin;
@@ -50,15 +63,7 @@ const getShopConnection = async (shopDbName) => {
         const baseUri = config.mongoUri.replace(/\/$/, '');
         const shopDbUri = `${baseUri}/${shopDbName}`;
 
-        // TLS options for Node.js v22 compatibility with MongoDB Atlas
-        const connectionOptions = {
-            tls: true,
-            tlsAllowInvalidCertificates: true,
-            serverSelectionTimeoutMS: 30000,
-            connectTimeoutMS: 30000,
-        };
-
-        connections[shopDbName] = await mongoose.createConnection(shopDbUri, connectionOptions);
+        connections[shopDbName] = await openConnection(shopDbUri, config.mongoUri);
 
         console.log(`✓ Connected to Shop DB: ${shopDbName}`);
         return connections[shopDbName];

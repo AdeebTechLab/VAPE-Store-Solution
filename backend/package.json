@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node --openssl-legacy-provider src/server.js",
     "dev": "set NODE_OPTIONS=--openssl-legacy-provider && nodemon src/server.js",
+    "migrate:passwords": "node scripts/migratePlainPasswords.js",
+    "set-password": "node scripts/setPlainPassword.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

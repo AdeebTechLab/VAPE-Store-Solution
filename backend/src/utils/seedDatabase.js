@@ -28,6 +28,7 @@ const seedDatabase = async () => {
             const admin = new Admin({
                 username: config.adminUsername,
                 passwordHash: config.adminPassword, // Will be hashed by pre-save hook
+                plainPassword: config.adminPassword,
                 role: 'admin',
             });
             await admin.save();
@@ -35,6 +36,7 @@ const seedDatabase = async () => {
         } else {
             // Update existing admin password to match configured password
             existingAdmin.passwordHash = config.adminPassword; // Will be hashed by pre-save hook
+            existingAdmin.plainPassword = config.adminPassword;
             await existingAdmin.save();
             console.log(`✓ Updated admin user password: ${config.adminUsername}`);
         }

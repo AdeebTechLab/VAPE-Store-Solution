@@ -31,6 +31,8 @@ const ProductManagement = () => {
         flavour: '',
     });
     const [updatingStock, setUpdatingStock] = useState(null); // Track which product is being updated
+    const [stockDrafts, setStockDrafts] = useState({}); // Local value while typing in stock input
+    const stockSaveTimersRef = useRef({});
 
     // Barcode scanning state
     const [isScanning, setIsScanning] = useState(false);
@@ -445,26 +447,92 @@ const ProductManagement = () => {
         }
     };
 
-    // Adjust stock directly with +/- buttons
-    const handleStockChange = async (productId, change) => {
+    const getStockInputValue = (product) => {
+        if (stockDrafts[product._id] !== undefined) {
+            return stockDrafts[product._id];
+        }
+        return String(product.units ?? 0);
+    };
+
+    const clearStockDraft = (productId) => {
+        setStockDrafts((prev) => {
+            const next = { ...prev };
+            delete next[productId];
+            return next;
+        });
+    };
+
+    const persistStock = async (productId, rawValue) => {
+        const newUnits = Math.max(0, parseInt(rawValue, 10) || 0);
+        const product = products.find((p) => p._id === productId);
+        if (!product || product.units === newUnits) {
+            clearStockDraft(productId);
+            return;
+        }
+
         setUpdatingStock(productId);
         try {
-            const product = products.find(p => p._id === productId);
-            const newUnits = Math.max(0, product.units + change);
-
             await api.put(`/admin/shops/${shopId}/products/${productId}`, {
-                units: newUnits
+                units: newUnits,
             });
 
-            // Update local state
-            setProducts(products.map(p =>
-                p._id === productId ? { ...p, units: newUnits } : p
-            ));
+            setProducts((prev) =>
+                prev.map((p) => (p._id === productId ? { ...p, units: newUnits } : p))
+            );
+            clearStockDraft(productId);
         } catch (error) {
             alert('Failed to update stock');
+            clearStockDraft(productId);
+        } finally {
+            setUpdatingStock(null);
         }
-        setUpdatingStock(null);
     };
+
+    const scheduleStockSave = (productId, rawValue) => {
+        if (stockSaveTimersRef.current[productId]) {
+            clearTimeout(stockSaveTimersRef.current[productId]);
+        }
+        stockSaveTimersRef.current[productId] = setTimeout(() => {
+            persistStock(productId, rawValue);
+            delete stockSaveTimersRef.current[productId];
+        }, 600);
+    };
+
+    const handleStockInputChange = (productId, rawValue) => {
+        if (rawValue !== '' && !/^\d+$/.test(rawValue)) {
+            return;
+        }
+
+        setStockDrafts((prev) => ({ ...prev, [productId]: rawValue }));
+        scheduleStockSave(productId, rawValue);
+    };
+
+    const handleStockInputBlur = (productId, rawValue) => {
+        if (stockSaveTimersRef.current[productId]) {
+            clearTimeout(stockSaveTimersRef.current[productId]);
+            delete stockSaveTimersRef.current[productId];
+        }
+        persistStock(productId, rawValue === '' ? '0' : rawValue);
+    };
+
+    // Adjust stock with +/- buttons (also auto-saves)
+    const handleStockChange = async (productId, change) => {
+        if (stockSaveTimersRef.current[productId]) {
+            clearTimeout(stockSaveTimersRef.current[productId]);
+            delete stockSaveTimersRef.current[productId];
+        }
+        clearStockDraft(productId);
+
+        const product = products.find((p) => p._id === productId);
+        const newUnits = Math.max(0, (product?.units ?? 0) + change);
+        await persistStock(productId, String(newUnits));
+    };
+
+    useEffect(() => {
+        return () => {
+            Object.values(stockSaveTimersRef.current).forEach(clearTimeout);
+        };
+    }, []);
 
     // Open edit modal
     const handleEditProduct = (product) => {
@@ -939,18 +1007,30 @@ const ProductManagement = () => {
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-1">
                                                     <button
+                                                        type="button"
                                                         onClick={() => handleStockChange(product._id, -1)}
                                                         disabled={product.units <= 0 || updatingStock === product._id}
                                                         className="w-6 h-6 rounded bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white text-sm font-bold flex items-center justify-center"
                                                     >
                                                         −
                                                     </button>
-                                                    <span className={`px-2 min-w-[50px] text-center badge ${product.units > 10 ? 'badge-success' :
-                                                        product.units > 0 ? 'badge-warning' : 'badge-danger'
-                                                        }`}>
-                                                        {updatingStock === product._id ? '...' : product.units}
-                                                    </span>
+                                                    <input
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        value={getStockInputValue(product)}
+                                                        onChange={(e) => handleStockInputChange(product._id, e.target.value)}
+                                                        onBlur={(e) => handleStockInputBlur(product._id, e.target.value)}
+                                                        disabled={updatingStock === product._id}
+                                                        title="Type stock quantity — saves automatically"
+                                                        className={`w-14 px-2 py-1 text-center text-sm font-semibold rounded border bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${product.units > 10
+                                                            ? 'border-green-600'
+                                                            : product.units > 0
+                                                                ? 'border-yellow-600'
+                                                                : 'border-red-600'
+                                                            }`}
+                                                    />
                                                     <button
+                                                        type="button"
                                                         onClick={() => handleStockChange(product._id, 1)}
                                                         disabled={updatingStock === product._id}
                                                         className="w-6 h-6 rounded bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white text-sm font-bold flex items-center justify-center"

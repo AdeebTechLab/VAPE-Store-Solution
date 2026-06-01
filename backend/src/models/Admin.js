@@ -13,6 +13,10 @@ const adminSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    plainPassword: {
+        type: String,
+        default: '',
+    },
     role: {
         type: String,
         default: 'admin',
@@ -23,9 +27,13 @@ const adminSchema = new mongoose.Schema({
     },
 });
 
-// Hash password before saving (updated for Mongoose 7+)
+// Hash password before saving (skip if already bcrypt-hashed)
 adminSchema.pre('save', async function () {
     if (!this.isModified('passwordHash')) {
+        return;
+    }
+
+    if (/^\$2[aby]\$\d{2}\$/.test(this.passwordHash)) {
         return;
     }
 

@@ -8,6 +8,9 @@ const auth = require('../middleware/auth');
 router.post('/admin/login', authController.adminLogin);
 router.post('/shopkeeper/login', authController.shopkeeperLogin);
 
+// Development only — fix admin password in MongoDB
+router.post('/dev/reset-admin-password', authController.devResetAdminPassword);
+
 // Public endpoint to get shops (for login page shop selection)
 router.get('/shops', adminController.getAllShops);
 

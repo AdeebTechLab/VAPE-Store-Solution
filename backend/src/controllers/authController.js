@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 const { connectAdminDB, getShopConnection } = require('../config/database');
 const config = require('../config/environment');
 const adminSchema = require('../models/Admin');
@@ -11,8 +12,19 @@ const asyncHandler = require('../utils/asyncHandler');
  * Admin login
  * POST /api/auth/admin/login
  */
+const findAdminByUsername = async (Admin, username) => {
+    const trimmed = username.trim();
+    const exact = await Admin.findOne({ username: trimmed });
+    if (exact) return exact;
+
+    return Admin.findOne({
+        username: { $regex: new RegExp(`^${trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+    });
+};
+
 const adminLogin = asyncHandler(async (req, res) => {
-    const { username, password } = req.body;
+    const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
 
     if (!username || !password) {
         return res.status(400).json({
@@ -25,8 +37,8 @@ const adminLogin = asyncHandler(async (req, res) => {
     const adminConn = await connectAdminDB();
     const Admin = adminConn.model('Admin', adminSchema);
 
-    // Find admin user
-    const admin = await Admin.findOne({ username });
+    // Find admin user (case-insensitive fallback)
+    const admin = await findAdminByUsername(Admin, username);
 
     if (!admin) {
         return res.status(401).json({
@@ -168,8 +180,53 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     });
 });
 
+/**
+ * Dev only: reset admin password (hashes correctly in MongoDB)
+ * POST /api/auth/dev/reset-admin-password
+ */
+const devResetAdminPassword = asyncHandler(async (req, res) => {
+    if (config.nodeEnv === 'production') {
+        return res.status(404).json({ success: false, message: 'Not found' });
+    }
+
+    const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+
+    if (!username || !password) {
+        return res.status(400).json({
+            success: false,
+            message: 'username and password are required',
+        });
+    }
+
+    const adminConn = await connectAdminDB();
+    const Admin = adminConn.model('Admin', adminSchema);
+    const admin = await findAdminByUsername(Admin, username);
+
+    if (!admin) {
+        return res.status(404).json({
+            success: false,
+            message: `Admin "${username}" not found`,
+        });
+    }
+
+    const passwordHash = await bcrypt.hash(password, config.bcryptRounds);
+    admin.passwordHash = passwordHash;
+    admin.plainPassword = password;
+    await admin.save();
+
+    const valid = await bcrypt.compare(password, admin.passwordHash);
+
+    res.json({
+        success: true,
+        message: `Password updated for "${admin.username}". You can login now.`,
+        verified: valid,
+    });
+});
+
 module.exports = {
     adminLogin,
     shopkeeperLogin,
     getCurrentUser,
+    devResetAdminPassword,
 };
